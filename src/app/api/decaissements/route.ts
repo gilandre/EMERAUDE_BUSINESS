@@ -14,7 +14,6 @@ async function getSoldeMarche(marcheId: string): Promise<{ encaissements: number
   const decSum = Number(dec._sum.montant ?? 0);
   const preMax = pre ? Number(pre.montant) : 0;
   const preUtilise = pre ? Number(pre.montantUtilise) : 0;
-  const disponible = enc - decSum + (preMax - preUtilise);
   return {
     encaissements: enc,
     decaissements: decSum,
@@ -49,6 +48,10 @@ export async function GET(request: NextRequest) {
       statut: true,
       reference: true,
       description: true,
+      motif: true,
+      beneficiaire: true,
+      modePaiement: true,
+      source: true,
     },
   });
 
@@ -79,7 +82,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { marcheId, montant, dateDecaissement, statut, reference, description } = parsed.data;
+  const { marcheId, montant, dateDecaissement, statut, reference, description, motif, beneficiaire, modePaiement, source } = parsed.data;
 
   const marche = await prisma.marche.findUnique({
     where: { id: marcheId },
@@ -88,16 +91,37 @@ export async function POST(request: NextRequest) {
   const deviseCode = marche?.deviseCode ?? "XOF";
   const deviseSym = deviseCode === "XOF" ? "FCFA" : deviseCode === "EUR" ? "€" : deviseCode === "USD" ? "$" : deviseCode;
 
-  const solde = await getSoldeMarche(marcheId);
-  const disponible = solde.encaissements - solde.decaissements + solde.prefinancement;
-  if (disponible < montant) {
-    return NextResponse.json(
-      {
-        error: "Trésorerie insuffisante",
-        detail: `Disponible: ${disponible.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} ${deviseSym}, demandé: ${montant.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} ${deviseSym}`,
-      },
-      { status: 400 }
-    );
+  // Vérification des fonds selon la source
+  if (source === "PREFINANCEMENT") {
+    const pref = await prisma.prefinancement.findUnique({ where: { marcheId } });
+    if (!pref || !pref.active) {
+      return NextResponse.json(
+        { error: "Préfinancement non disponible", detail: "Aucun préfinancement actif pour ce marché" },
+        { status: 400 }
+      );
+    }
+    const restant = Number(pref.montantRestant);
+    if (restant < montant) {
+      return NextResponse.json(
+        {
+          error: "Préfinancement insuffisant",
+          detail: `Restant: ${restant.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} ${deviseSym}, demandé: ${montant.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} ${deviseSym}`,
+        },
+        { status: 400 }
+      );
+    }
+  } else {
+    const solde = await getSoldeMarche(marcheId);
+    const disponible = solde.encaissements - solde.decaissements + solde.prefinancement;
+    if (disponible < montant) {
+      return NextResponse.json(
+        {
+          error: "Trésorerie insuffisante",
+          detail: `Disponible: ${disponible.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} ${deviseSym}, demandé: ${montant.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} ${deviseSym}`,
+        },
+        { status: 400 }
+      );
+    }
   }
 
   const decaissement = await prisma.decaissement.create({
@@ -110,8 +134,30 @@ export async function POST(request: NextRequest) {
       statut: statut ?? "VALIDE",
       reference: reference ?? null,
       description: description ?? null,
+      motif,
+      beneficiaire,
+      modePaiement: modePaiement ?? null,
+      source: source ?? "TRESORERIE",
     },
   });
+
+  // Mise à jour du préfinancement si source = PREFINANCEMENT
+  if (source === "PREFINANCEMENT") {
+    const pref = await prisma.prefinancement.findUnique({ where: { marcheId } });
+    if (pref) {
+      const newUtilise = Number(pref.montantUtilise) + montant;
+      const newRestant = Number(pref.montant) - newUtilise;
+      await prisma.prefinancement.update({
+        where: { marcheId },
+        data: {
+          montantUtilise: newUtilise,
+          montantUtiliseXOF: newUtilise,
+          montantRestant: newRestant,
+          montantRestantXOF: newRestant,
+        },
+      });
+    }
+  }
 
   void prisma.auditLog.create({
     data: {
@@ -119,8 +165,8 @@ export async function POST(request: NextRequest) {
       action: "CREATE",
       entity: "Decaissement",
       entityId: decaissement.id,
-      newData: { marcheId, montant, dateDecaissement },
-      description: `Décaissement créé: ${montant} ${deviseSym} - Marché ${marcheId}`,
+      newData: { marcheId, montant, dateDecaissement, motif, beneficiaire, source },
+      description: `Décaissement créé: ${montant} ${deviseSym} → ${beneficiaire} (${motif}) [${source}] - Marché ${marcheId}`,
     },
   });
 

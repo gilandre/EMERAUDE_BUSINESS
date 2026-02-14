@@ -1,6 +1,6 @@
 // =============================================================================
 // EMERAUDE BUSINESS - Schema Prisma Enterprise
-// Gestion de marchés BTP - Tous modules
+// Gestion de marchés - Tous modules
 // =============================================================================
 
 generator client {
@@ -370,6 +370,11 @@ enum StatutDecaissement {
   PAYE    // Payé
 }
 
+enum SourceDecaissement {
+  TRESORERIE       // Décaissement sur trésorerie (encaissements)
+  PREFINANCEMENT   // Décaissement sur préfinancement
+}
+
 model Decaissement {
   id                String   @id @default(cuid())
   marcheId          String   @map("marche_id")
@@ -380,6 +385,13 @@ model Decaissement {
   statut            StatutDecaissement @default(VALIDE)
   reference         String?
   description       String?
+
+  // Champs enrichis
+  motif             String   @default("Non renseigné")
+  beneficiaire      String   @default("Non renseigné")
+  modePaiement      String?  @map("mode_paiement")   // especes, virement, cheque, mobile_money
+  source            SourceDecaissement @default(TRESORERIE)
+
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
@@ -388,6 +400,8 @@ model Decaissement {
   @@index([marcheId])
   @@index([dateDecaissement(sort: Desc)])
   @@index([statut])
+  @@index([source])
+  @@index([beneficiaire])
 }
 
 model Prefinancement {

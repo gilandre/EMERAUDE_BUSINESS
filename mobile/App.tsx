@@ -9,6 +9,7 @@ import { LoginScreen } from './src/screens/LoginScreen';
 import { DashboardScreen } from './src/screens/DashboardScreen';
 import { MarchesScreen } from './src/screens/MarchesScreen';
 import { MarcheDetailScreen } from './src/screens/MarcheDetailScreen';
+import { CreateMarcheScreen } from './src/screens/CreateMarcheScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -54,6 +55,11 @@ function AppNavigator() {
         name="MarcheDetail"
         component={MarcheDetailScreen}
         options={({ route }) => ({ title: route.params?.id ? 'Détail marché' : 'Marché' })}
+      />
+      <Stack.Screen
+        name="CreateMarche"
+        component={CreateMarcheScreen}
+        options={{ title: 'Nouveau marché' }}
       />
     </Stack.Navigator>
   );

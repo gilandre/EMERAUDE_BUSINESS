@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
-import { createDecaissementSchema, updateDecaissementSchema, STATUT_DECAISSEMENT, type CreateDecaissementInput, type UpdateDecaissementInput } from "@/validations/decaissement.schema";
+import { createDecaissementSchema, updateDecaissementSchema, STATUT_DECAISSEMENT, SOURCES_DECAISSEMENT, MODES_PAIEMENT, type CreateDecaissementInput, type UpdateDecaissementInput } from "@/validations/decaissement.schema";
 import { MontantDisplay } from "@/components/devises/MontantDisplay";
 import type { DecaissementItem } from "./DecaissementsList";
 
@@ -20,6 +20,18 @@ interface DecaissementFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
 }
+
+const SOURCE_LABELS: Record<string, string> = {
+  TRESORERIE: "Trésorerie",
+  PREFINANCEMENT: "Préfinancement",
+};
+
+const MODE_PAIEMENT_LABELS: Record<string, string> = {
+  especes: "Espèces",
+  virement: "Virement",
+  cheque: "Chèque",
+  mobile_money: "Mobile Money",
+};
 
 export function DecaissementForm({
   marcheId,
@@ -38,6 +50,10 @@ export function DecaissementForm({
     statut: "VALIDE" as "PREVU" | "VALIDE" | "PAYE",
     reference: "",
     description: "",
+    motif: "",
+    beneficiaire: "",
+    modePaiement: "",
+    source: "TRESORERIE" as "TRESORERIE" | "PREFINANCEMENT",
   });
 
   useEffect(() => {
@@ -48,6 +64,10 @@ export function DecaissementForm({
         statut: (decaissement.statut ?? "VALIDE") as "PREVU" | "VALIDE" | "PAYE",
         reference: decaissement.reference ?? "",
         description: decaissement.description ?? "",
+        motif: decaissement.motif ?? "",
+        beneficiaire: decaissement.beneficiaire ?? "",
+        modePaiement: decaissement.modePaiement ?? "",
+        source: (decaissement.source ?? "TRESORERIE") as "TRESORERIE" | "PREFINANCEMENT",
       });
     } else {
       setForm({
@@ -56,6 +76,10 @@ export function DecaissementForm({
         statut: "VALIDE",
         reference: "",
         description: "",
+        motif: "",
+        beneficiaire: "",
+        modePaiement: "",
+        source: "TRESORERIE",
       });
     }
   }, [decaissement]);
@@ -92,6 +116,10 @@ export function DecaissementForm({
         statut: "VALIDE",
         reference: "",
         description: "",
+        motif: "",
+        beneficiaire: "",
+        modePaiement: "",
+        source: "TRESORERIE",
       });
       onSuccess?.();
     },
@@ -154,6 +182,10 @@ export function DecaissementForm({
         statut: form.statut,
         reference: form.reference || undefined,
         description: form.description || undefined,
+        motif: form.motif || undefined,
+        beneficiaire: form.beneficiaire || undefined,
+        modePaiement: (form.modePaiement as "especes" | "virement" | "cheque" | "mobile_money") || undefined,
+        source: form.source,
       };
       const parsed = updateDecaissementSchema.safeParse(payload);
       if (!parsed.success) {
@@ -174,6 +206,10 @@ export function DecaissementForm({
         statut: form.statut,
         reference: form.reference || undefined,
         description: form.description || undefined,
+        motif: form.motif,
+        beneficiaire: form.beneficiaire,
+        modePaiement: (form.modePaiement as "especes" | "virement" | "cheque" | "mobile_money") || undefined,
+        source: form.source,
       };
       const parsed = createDecaissementSchema.safeParse(payload);
       if (!parsed.success) {
@@ -195,7 +231,7 @@ export function DecaissementForm({
         <CardTitle>{isEdit ? "Modifier le décaissement" : "Ajouter un décaissement"}</CardTitle>
         <p className="text-sm text-muted-foreground">
           Trésorerie disponible: <strong><MontantDisplay montant={maxMontant} deviseCode={deviseCode} /></strong>
-          {isEdit && " (inclut l’annulation du montant actuel)"}. Le décaissement ne peut pas dépasser ce montant.
+          {isEdit && " (inclut l'annulation du montant actuel)"}. Le décaissement ne peut pas dépasser ce montant.
         </p>
       </CardHeader>
       <CardContent>
@@ -238,6 +274,63 @@ export function DecaissementForm({
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="beneficiaire">Bénéficiaire *</Label>
+              <Input
+                id="beneficiaire"
+                value={form.beneficiaire}
+                onChange={(e) => setForm((p) => ({ ...p, beneficiaire: e.target.value }))}
+                placeholder="Nom du bénéficiaire"
+                required
+              />
+              {errors.beneficiaire && (
+                <p className="text-sm text-destructive">{errors.beneficiaire}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="motif">Motif *</Label>
+              <Input
+                id="motif"
+                value={form.motif}
+                onChange={(e) => setForm((p) => ({ ...p, motif: e.target.value }))}
+                placeholder="Raison du décaissement"
+                required
+              />
+              {errors.motif && (
+                <p className="text-sm text-destructive">{errors.motif}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="source">Source des fonds</Label>
+              <Select
+                id="source"
+                value={form.source}
+                onValueChange={(v) => setForm((p) => ({ ...p, source: v as "TRESORERIE" | "PREFINANCEMENT" }))}
+                options={SOURCES_DECAISSEMENT.map((s) => ({
+                  value: s,
+                  label: SOURCE_LABELS[s] ?? s,
+                }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="modePaiement">Mode de paiement</Label>
+              <Select
+                id="modePaiement"
+                value={form.modePaiement}
+                onValueChange={(v) => setForm((p) => ({ ...p, modePaiement: v }))}
+                options={[
+                  { value: "", label: "— Sélectionner —" },
+                  ...MODES_PAIEMENT.map((m) => ({
+                    value: m,
+                    label: MODE_PAIEMENT_LABELS[m] ?? m,
+                  })),
+                ]}
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="statut">Statut</Label>
               <Select
@@ -250,6 +343,7 @@ export function DecaissementForm({
                 }))}
               />
             </div>
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="reference">Référence</Label>

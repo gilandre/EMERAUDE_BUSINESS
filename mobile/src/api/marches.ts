@@ -42,6 +42,10 @@ export interface Decaissement {
   statut: string;
   reference?: string | null;
   description?: string | null;
+  motif?: string;
+  beneficiaire?: string;
+  modePaiement?: string | null;
+  source?: string;
 }
 
 export interface Prefinancement {
@@ -55,6 +59,19 @@ export interface Prefinancement {
 
 export function getMarche(id: string): Promise<MarcheDetail> {
   return apiFetch<MarcheDetail>(`/api/marches/${id}`);
+}
+
+export function createMarche(data: {
+  libelle: string;
+  montant: number;
+  deviseCode?: string;
+  dateDebut?: string;
+  dateFin?: string;
+}): Promise<{ id: string; code: string; libelle: string }> {
+  return apiFetch('/api/marches', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 }
 
 export function createAccompte(data: {
@@ -77,6 +94,10 @@ export function createDecaissement(data: {
   statut?: string;
   reference?: string;
   description?: string;
+  motif: string;
+  beneficiaire: string;
+  modePaiement?: string;
+  source?: string;
 }): Promise<Decaissement> {
   return apiFetch<Decaissement>('/api/decaissements', {
     method: 'POST',

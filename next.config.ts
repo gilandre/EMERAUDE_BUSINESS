@@ -122,11 +122,6 @@ const nextConfig: NextConfig = {
   output: "standalone",
   serverExternalPackages: ["jose", "ioredis", "bullmq", "sonner"],
   webpack: (config) => {
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      react: require.resolve("react"),
-      "react-dom": require.resolve("react-dom"),
-    };
     return config;
   },
   async rewrites() {

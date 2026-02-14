@@ -28,6 +28,10 @@ export interface DecaissementItem {
   statut?: "PREVU" | "VALIDE" | "PAYE";
   reference: string | null;
   description: string | null;
+  motif?: string;
+  beneficiaire?: string;
+  modePaiement?: string | null;
+  source?: "TRESORERIE" | "PREFINANCEMENT";
 }
 
 interface DecaissementsListProps {
@@ -110,10 +114,11 @@ export function DecaissementsList({ marcheId, deviseCode = "XOF", soldeDisponibl
             <TableHeader>
               <TableRow>
                 <TableHead>Date</TableHead>
-                <TableHead>Référence</TableHead>
+                <TableHead>Bénéficiaire</TableHead>
+                <TableHead>Motif</TableHead>
+                <TableHead>Source</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead>Montant</TableHead>
-                <TableHead>Description</TableHead>
                 <TableHead className="w-[100px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -121,7 +126,13 @@ export function DecaissementsList({ marcheId, deviseCode = "XOF", soldeDisponibl
               {items.map((d) => (
                 <TableRow key={d.id}>
                   <TableCell>{formatDate(d.dateDecaissement)}</TableCell>
-                  <TableCell>{d.reference ?? "—"}</TableCell>
+                  <TableCell className="font-medium">{d.beneficiaire ?? "—"}</TableCell>
+                  <TableCell className="max-w-[150px] truncate">{d.motif ?? "—"}</TableCell>
+                  <TableCell>
+                    <Badge variant={d.source === "PREFINANCEMENT" ? "outline" : "secondary"}>
+                      {d.source === "PREFINANCEMENT" ? "Préfi" : "Tréso"}
+                    </Badge>
+                  </TableCell>
                   <TableCell>
                     <Badge variant={d.statut === "PAYE" ? "default" : d.statut === "VALIDE" ? "secondary" : "outline"}>
                       {d.statut ?? "VALIDE"}
@@ -129,9 +140,6 @@ export function DecaissementsList({ marcheId, deviseCode = "XOF", soldeDisponibl
                   </TableCell>
                   <TableCell className="text-red-600 font-medium">
                     -<MontantDisplay montant={d.montant} deviseCode={deviseCode} />
-                  </TableCell>
-                  <TableCell className="text-muted-foreground max-w-[200px] truncate">
-                    {d.description ?? "—"}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">

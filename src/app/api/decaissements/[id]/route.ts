@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { updateDecaissementSchema } from "@/validations/decaissement.schema";
-import type { StatutDecaissement } from "@prisma/client";
+import type { StatutDecaissement, SourceDecaissement } from "@prisma/client";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -105,6 +105,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     statut?: StatutDecaissement;
     reference?: string | null;
     description?: string | null;
+    motif?: string;
+    beneficiaire?: string;
+    modePaiement?: string | null;
+    source?: SourceDecaissement;
   } = {};
 
   if (parsed.data.statut != null) data.statut = parsed.data.statut as StatutDecaissement;
@@ -118,11 +122,62 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   }
   if (parsed.data.reference !== undefined) data.reference = parsed.data.reference ?? null;
   if (parsed.data.description !== undefined) data.description = parsed.data.description ?? null;
+  if (parsed.data.motif !== undefined) data.motif = parsed.data.motif;
+  if (parsed.data.beneficiaire !== undefined) data.beneficiaire = parsed.data.beneficiaire;
+  if (parsed.data.modePaiement !== undefined) data.modePaiement = parsed.data.modePaiement ?? null;
+
+  // Gestion du changement de source (préfinancement)
+  const oldSource = existing.source;
+  const newSource = parsed.data.source as SourceDecaissement | undefined;
+  const oldMontant = Number(existing.montant);
+  const newMontant = parsed.data.montant ?? oldMontant;
+
+  if (newSource !== undefined) data.source = newSource;
+
+  // Reverser l'ancien impact préfinancement si nécessaire
+  const sourceChanged = newSource !== undefined && newSource !== oldSource;
+  const montantChanged = parsed.data.montant != null && parsed.data.montant !== oldMontant;
+
+  if (oldSource === "PREFINANCEMENT" && (sourceChanged || montantChanged)) {
+    const pref = await prisma.prefinancement.findUnique({ where: { marcheId: existing.marcheId } });
+    if (pref) {
+      const newUtilise = Math.max(0, Number(pref.montantUtilise) - oldMontant);
+      const newRestant = Number(pref.montant) - newUtilise;
+      await prisma.prefinancement.update({
+        where: { marcheId: existing.marcheId },
+        data: {
+          montantUtilise: newUtilise,
+          montantUtiliseXOF: newUtilise,
+          montantRestant: newRestant,
+          montantRestantXOF: newRestant,
+        },
+      });
+    }
+  }
 
   const decaissement = await prisma.decaissement.update({
     where: { id },
     data,
   });
+
+  // Appliquer le nouvel impact préfinancement si nécessaire
+  const effectiveSource = newSource ?? oldSource;
+  if (effectiveSource === "PREFINANCEMENT" && (sourceChanged || montantChanged)) {
+    const pref = await prisma.prefinancement.findUnique({ where: { marcheId: existing.marcheId } });
+    if (pref) {
+      const newUtilise = Number(pref.montantUtilise) + newMontant;
+      const newRestant = Number(pref.montant) - newUtilise;
+      await prisma.prefinancement.update({
+        where: { marcheId: existing.marcheId },
+        data: {
+          montantUtilise: newUtilise,
+          montantUtiliseXOF: newUtilise,
+          montantRestant: newRestant,
+          montantRestantXOF: newRestant,
+        },
+      });
+    }
+  }
 
   void prisma.auditLog.create({
     data: {
@@ -163,6 +218,25 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
 
   const marcheId = decaissement.marcheId;
 
+  // Reverser l'impact préfinancement si nécessaire
+  if (decaissement.source === "PREFINANCEMENT") {
+    const pref = await prisma.prefinancement.findUnique({ where: { marcheId } });
+    if (pref) {
+      const montant = Number(decaissement.montant);
+      const newUtilise = Math.max(0, Number(pref.montantUtilise) - montant);
+      const newRestant = Number(pref.montant) - newUtilise;
+      await prisma.prefinancement.update({
+        where: { marcheId },
+        data: {
+          montantUtilise: newUtilise,
+          montantUtiliseXOF: newUtilise,
+          montantRestant: newRestant,
+          montantRestantXOF: newRestant,
+        },
+      });
+    }
+  }
+
   await prisma.decaissement.delete({ where: { id } });
 
   void prisma.auditLog.create({
@@ -171,7 +245,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
       action: "DELETE",
       entity: "Decaissement",
       entityId: id,
-      description: `Décaissement supprimé: ${Number(decaissement.montant)} - Marché ${marcheId}`,
+      description: `Décaissement supprimé: ${Number(decaissement.montant)} → ${decaissement.beneficiaire} [${decaissement.source}] - Marché ${marcheId}`,
     },
   });
 

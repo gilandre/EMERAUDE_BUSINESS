@@ -15,6 +15,7 @@ import { useRoute, RouteProp } from '@react-navigation/native';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
+import { DatePickerInput } from '../components/DatePickerInput';
 import { colors, typography, spacing } from '../theme';
 import {
   getMarche,
@@ -24,11 +25,22 @@ import {
   type MarcheDetail,
   type Accompte,
   type Decaissement,
-  type Prefinancement,
 } from '../api/marches';
 
 type NavParams = { MarcheDetail: { id: string } };
 type Section = 'vue-ensemble' | 'accomptes' | 'decaissements' | 'prefinancement' | 'pieces';
+
+const SOURCE_LABELS: Record<string, string> = {
+  TRESORERIE: 'Trésorerie',
+  PREFINANCEMENT: 'Préfinancement',
+};
+
+const MODE_PAIEMENT_OPTIONS = [
+  { value: 'especes', label: 'Espèces' },
+  { value: 'virement', label: 'Virement' },
+  { value: 'cheque', label: 'Chèque' },
+  { value: 'mobile_money', label: 'Mobile Money' },
+];
 
 export function MarcheDetailScreen() {
   const route = useRoute<RouteProp<NavParams, 'MarcheDetail'>>();
@@ -38,19 +50,25 @@ export function MarcheDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [section, setSection] = useState<Section>('vue-ensemble');
 
-  // Form states
+  // Accompte form states
   const [accompteMontant, setAccompteMontant] = useState('');
   const [accompteDate, setAccompteDate] = useState(new Date().toISOString().slice(0, 10));
   const [accompteRef, setAccompteRef] = useState('');
   const [accompteDesc, setAccompteDesc] = useState('');
   const [accompteSubmitting, setAccompteSubmitting] = useState(false);
 
+  // Decaissement form states
   const [decMontant, setDecMontant] = useState('');
   const [decDate, setDecDate] = useState(new Date().toISOString().slice(0, 10));
   const [decRef, setDecRef] = useState('');
   const [decDesc, setDecDesc] = useState('');
+  const [decMotif, setDecMotif] = useState('');
+  const [decBeneficiaire, setDecBeneficiaire] = useState('');
+  const [decModePaiement, setDecModePaiement] = useState('');
+  const [decSource, setDecSource] = useState<'TRESORERIE' | 'PREFINANCEMENT'>('TRESORERIE');
   const [decSubmitting, setDecSubmitting] = useState(false);
 
+  // Prefinancement form states
   const [prefMontant, setPrefMontant] = useState('');
   const [prefSubmitting, setPrefSubmitting] = useState(false);
 
@@ -117,6 +135,14 @@ export function MarcheDetailScreen() {
       Alert.alert('Erreur', 'Montant invalide');
       return;
     }
+    if (!decMotif.trim()) {
+      Alert.alert('Erreur', 'Le motif est requis');
+      return;
+    }
+    if (!decBeneficiaire.trim()) {
+      Alert.alert('Erreur', 'Le bénéficiaire est requis');
+      return;
+    }
     const syn = data?.synthese;
     const soldeDispo = (syn?.solde ?? 0) + (syn?.prefinancementMax ?? 0) - (syn?.prefinancementUtilise ?? 0);
     if (montant > soldeDispo) {
@@ -132,10 +158,18 @@ export function MarcheDetailScreen() {
         statut: 'VALIDE',
         reference: decRef || undefined,
         description: decDesc || undefined,
+        motif: decMotif.trim(),
+        beneficiaire: decBeneficiaire.trim(),
+        modePaiement: decModePaiement || undefined,
+        source: decSource,
       });
       setDecMontant('');
       setDecRef('');
       setDecDesc('');
+      setDecMotif('');
+      setDecBeneficiaire('');
+      setDecModePaiement('');
+      setDecSource('TRESORERIE');
       load();
       Alert.alert('Succès', 'Décaissement enregistré.');
     } catch (e) {
@@ -278,17 +312,16 @@ export function MarcheDetailScreen() {
           <Card>
             <Text style={styles.sectionTitle}>Encaisser un accompte</Text>
             <Input
-              label="Montant"
+              label="Montant *"
               value={accompteMontant}
               onChangeText={setAccompteMontant}
               placeholder="0"
               keyboardType="decimal-pad"
             />
-            <Input
+            <DatePickerInput
               label="Date d'encaissement"
               value={accompteDate}
-              onChangeText={setAccompteDate}
-              placeholder="AAAA-MM-JJ"
+              onChange={setAccompteDate}
             />
             <Input label="Référence (optionnel)" value={accompteRef} onChangeText={setAccompteRef} />
             <Input label="Description (optionnel)" value={accompteDesc} onChangeText={setAccompteDesc} />
@@ -319,17 +352,59 @@ export function MarcheDetailScreen() {
             <Text style={styles.sectionTitle}>Décaisser</Text>
             <Text style={styles.hint}>Disponible : {formatMontant(soldeDisponible, data.deviseCode)}</Text>
             <Input
-              label="Montant"
+              label="Montant *"
               value={decMontant}
               onChangeText={setDecMontant}
               placeholder="0"
               keyboardType="decimal-pad"
             />
             <Input
+              label="Bénéficiaire *"
+              value={decBeneficiaire}
+              onChangeText={setDecBeneficiaire}
+              placeholder="Nom du bénéficiaire"
+            />
+            <Input
+              label="Motif *"
+              value={decMotif}
+              onChangeText={setDecMotif}
+              placeholder="Raison du décaissement"
+            />
+
+            <Text style={styles.fieldLabel}>Source des fonds</Text>
+            <View style={styles.toggleRow}>
+              {(['TRESORERIE', 'PREFINANCEMENT'] as const).map((s) => (
+                <TouchableOpacity
+                  key={s}
+                  onPress={() => setDecSource(s)}
+                  style={[styles.toggleBtn, decSource === s && styles.toggleBtnActive]}
+                >
+                  <Text style={[styles.toggleText, decSource === s && styles.toggleTextActive]}>
+                    {SOURCE_LABELS[s]}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.fieldLabel}>Mode de paiement</Text>
+            <View style={styles.toggleRow}>
+              {MODE_PAIEMENT_OPTIONS.map((opt) => (
+                <TouchableOpacity
+                  key={opt.value}
+                  onPress={() => setDecModePaiement(decModePaiement === opt.value ? '' : opt.value)}
+                  style={[styles.toggleBtn, decModePaiement === opt.value && styles.toggleBtnActive]}
+                >
+                  <Text style={[styles.toggleText, decModePaiement === opt.value && styles.toggleTextActive]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <DatePickerInput
               label="Date de décaissement"
               value={decDate}
-              onChangeText={setDecDate}
-              placeholder="AAAA-MM-JJ"
+              onChange={setDecDate}
             />
             <Input label="Référence (optionnel)" value={decRef} onChangeText={setDecRef} />
             <Input label="Description (optionnel)" value={decDesc} onChangeText={setDecDesc} />
@@ -343,9 +418,19 @@ export function MarcheDetailScreen() {
           <Text style={styles.listTitle}>Derniers décaissements</Text>
           {(data.decaissements ?? []).slice(0, 10).map((d: Decaissement) => (
             <Card key={d.id}>
-              <Text style={styles.rowMontant}>{formatMontant(d.montant, data.deviseCode)}</Text>
-              <Text style={styles.rowDate}>{formatDate(d.dateDecaissement)} • {d.statut}</Text>
-              {d.reference ? <Text style={styles.rowRef}>{d.reference}</Text> : null}
+              <View style={styles.decRow}>
+                <Text style={styles.rowMontant}>{formatMontant(d.montant, data.deviseCode)}</Text>
+                {d.source && (
+                  <View style={[styles.sourceBadge, d.source === 'PREFINANCEMENT' && styles.sourceBadgePrefi]}>
+                    <Text style={styles.sourceBadgeText}>
+                      {d.source === 'PREFINANCEMENT' ? 'Préfi' : 'Tréso'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              {d.beneficiaire ? <Text style={styles.rowBenef}>{d.beneficiaire}</Text> : null}
+              {d.motif ? <Text style={styles.rowMotif}>{d.motif}</Text> : null}
+              <Text style={styles.rowDate}>{formatDate(d.dateDecaissement)} · {d.statut}</Text>
             </Card>
           ))}
           {(!data.decaissements || data.decaissements.length === 0) && (
@@ -392,11 +477,11 @@ export function MarcheDetailScreen() {
           <Text style={styles.sectionTitle}>Pièces justificatives</Text>
           <Text style={styles.hint}>Ajoutez des preuves (photo, vidéo ou document).</Text>
           <View style={styles.piecesRow}>
-            <Button title="📷 Photo" onPress={showPiecesInfo} variant="outline" style={styles.pieceBtn} />
-            <Button title="🎬 Vidéo" onPress={showPiecesInfo} variant="outline" style={styles.pieceBtn} />
-            <Button title="📎 Fichier" onPress={showPiecesInfo} variant="outline" style={styles.pieceBtn} />
+            <Button title="Photo" onPress={showPiecesInfo} variant="outline" style={styles.pieceBtn} />
+            <Button title="Vidéo" onPress={showPiecesInfo} variant="outline" style={styles.pieceBtn} />
+            <Button title="Fichier" onPress={showPiecesInfo} variant="outline" style={styles.pieceBtn} />
           </View>
-          <Text style={styles.optionalLabel}>(Optionnel – fonctionnalité à venir)</Text>
+          <Text style={styles.optionalLabel}>(Optionnel - fonctionnalité à venir)</Text>
         </Card>
       )}
 
@@ -430,10 +515,22 @@ const styles = StyleSheet.create({
   solde: { fontWeight: typography.fontWeights.bold as '700', color: colors.success, marginTop: spacing.sm },
   sectionTitle: { fontSize: typography.fontSizes.lg, fontWeight: typography.fontWeights.semibold as '600', marginBottom: spacing.sm },
   hint: { fontSize: typography.fontSizes.sm, color: colors.textSecondary, marginBottom: spacing.sm },
+  fieldLabel: { fontSize: typography.fontSizes.sm, fontWeight: typography.fontWeights.medium as '500', color: colors.textSecondary, marginBottom: spacing.xs },
+  toggleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
+  toggleBtn: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  toggleBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  toggleText: { fontSize: typography.fontSizes.sm, color: colors.text },
+  toggleTextActive: { color: '#fff', fontWeight: typography.fontWeights.semibold as '600' },
   listTitle: { fontSize: typography.fontSizes.base, fontWeight: typography.fontWeights.semibold as '600', marginTop: spacing.md, marginBottom: spacing.sm },
+  decRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   rowMontant: { fontSize: typography.fontSizes.base, fontWeight: typography.fontWeights.semibold as '600', color: colors.text },
+  rowBenef: { fontSize: typography.fontSizes.sm, fontWeight: typography.fontWeights.medium as '500', color: colors.primary, marginTop: spacing.xs },
+  rowMotif: { fontSize: typography.fontSizes.sm, color: colors.text, marginTop: spacing.xs },
   rowDate: { fontSize: typography.fontSizes.sm, color: colors.textSecondary, marginTop: spacing.xs },
   rowRef: { fontSize: typography.fontSizes.sm, color: colors.textMuted, marginTop: spacing.xs },
+  sourceBadge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: 6, backgroundColor: colors.surface },
+  sourceBadgePrefi: { backgroundColor: '#fef3c7' },
+  sourceBadgeText: { fontSize: typography.fontSizes.xs, fontWeight: typography.fontWeights.medium as '500', color: colors.textSecondary },
   emptyList: { fontSize: typography.fontSizes.sm, color: colors.textMuted, fontStyle: 'italic' },
   piecesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
   pieceBtn: { flex: 1, minWidth: 100 },

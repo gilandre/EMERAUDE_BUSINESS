@@ -158,7 +158,7 @@ async function getHandler(req: Request, _ctx: { params: Promise<Record<string, s
     }),
     prisma.decaissement.findMany({
       where: { dateDecaissement: { gte: twelveMonthsAgo } },
-      select: { montantXOF: true, description: true, reference: true, marche: { select: { deviseCode: true } } },
+      select: { montantXOF: true, description: true, reference: true, beneficiaire: true, source: true, marche: { select: { deviseCode: true } } },
     }),
     prisma.marche.findMany({
       where: { statut: "actif" },
@@ -288,7 +288,7 @@ async function getHandler(req: Request, _ctx: { params: Promise<Record<string, s
     categorySums[cat] = (categorySums[cat] ?? 0) + val;
     const devise = (d as { marche?: { deviseCode?: string } }).marche?.deviseCode ?? "XOF";
     deviseSums[devise] = (deviseSums[devise] ?? 0) + val;
-    const benef = (d.reference ?? "").trim() || "Sans référence";
+    const benef = (d.beneficiaire ?? "").trim() || "Non renseigné";
     beneficiarySums[benef] = (beneficiarySums[benef] ?? 0) + val;
   }
   const decByCategory = Object.entries(categorySums).map(([name, value]) => ({ name, value }));

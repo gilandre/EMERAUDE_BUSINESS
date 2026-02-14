@@ -99,7 +99,15 @@ export function MarchesScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
       }
     >
-      <Text style={styles.title}>Marchés</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.title}>Marchés</Text>
+        <TouchableOpacity
+          style={styles.addBtn}
+          onPress={() => navigation.navigate('CreateMarche')}
+        >
+          <Text style={styles.addBtnText}>+ Nouveau</Text>
+        </TouchableOpacity>
+      </View>
 
       <TextInput
         style={styles.search}
@@ -165,11 +173,27 @@ const styles = StyleSheet.create({
   loadingText: {
     color: colors.textSecondary,
   },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
   title: {
     fontSize: typography.fontSizes.xxl,
     fontWeight: typography.fontWeights.bold,
     color: colors.text,
-    marginBottom: spacing.lg,
+  },
+  addBtn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 10,
+  },
+  addBtnText: {
+    color: '#fff',
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.semibold,
   },
   search: {
     backgroundColor: colors.surface,

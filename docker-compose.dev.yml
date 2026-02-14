@@ -1,0 +1,39 @@
+# Services infra uniquement pour développement local
+# Usage: docker-compose -f docker-compose.dev.yml up -d
+# Les conteneurs restent visibles dans Docker Desktop et redémarrent automatiquement
+
+name: emeraude-business-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: emeraude-postgres-dev
+    restart: unless-stopped
+    ports: ["5433:5432"]
+    environment:
+      POSTGRES_USER: emeraude
+      POSTGRES_PASSWORD: emeraude
+      POSTGRES_DB: emeraude
+    volumes: [postgres_data_dev:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U emeraude -d emeraude"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: emeraude-redis-dev
+    restart: unless-stopped
+    ports: ["6379:6379"]
+    command: redis-server --appendonly yes
+    volumes: [redis_data_dev:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres_data_dev:
+  redis_data_dev:

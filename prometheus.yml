@@ -1,0 +1,23 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# EMERAUDE BUSINESS - Prometheus
+# Scrape : Prometheus, applications Next.js (métriques si exposées)
+# ─────────────────────────────────────────────────────────────────────────────
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: nextjs
+    metrics_path: /api/metrics
+    static_configs:
+      - targets:
+          - app1:3000
+          - app2:3000
+          - app3:3000
+    scrape_interval: 30s
+    scrape_timeout: 10s

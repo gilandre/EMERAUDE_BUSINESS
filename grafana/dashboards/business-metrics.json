@@ -1,0 +1,28 @@
+{
+  "dashboard": {
+    "title": "Emeraude Business - Business Metrics",
+    "tags": ["emeraude", "business"],
+    "panels": [
+      {
+        "title": "Active Users",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "active_users",
+            "legendFormat": "Active"
+          }
+        ]
+      },
+      {
+        "title": "Queue Length",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "queue_length",
+            "legendFormat": "{{queue}}"
+          }
+        ]
+      }
+    ]
+  }
+}

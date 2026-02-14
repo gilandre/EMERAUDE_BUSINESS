@@ -1,0 +1,663 @@
+// =============================================================================
+// EMERAUDE BUSINESS - Schema Prisma Enterprise
+// Gestion de marchés BTP - Tous modules
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Seed: npm run seed
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// AUTHENTIFICATION & UTILISATEURS
+// =============================================================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String?   @map("password_hash")
+  nom           String?
+  prenom        String?
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+  active        Boolean   @default(true)
+  lastLoginAt   DateTime? @map("last_login_at")
+  totpSecret    String?   @map("totp_secret")
+  totpEnabled   Boolean   @default(false) @map("totp_enabled")
+  backupCodes   String[]  @map("backup_codes") // hashed
+  failedLoginAttempts Int @default(0) @map("failed_login_attempts")
+  lockedUntil   DateTime? @map("locked_until")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  profilId      String?   @map("profil_id")
+  profil        Profil?   @relation(fields: [profilId], references: [id], onDelete: SetNull)
+  accounts      Account[]
+  sessions      Session[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
+  userMenus     UserMenu[]
+  notificationPrefs UserNotificationPreferences?
+  pushSubscriptions PushSubscription[]
+}
+
+model UserNotificationPreferences {
+  id              String   @id @default(cuid())
+  userId          String   @unique @map("user_id")
+  canalInApp      Boolean  @default(true) @map("canal_in_app")
+  canalEmail      Boolean  @default(true) @map("canal_email")
+  canalPush       Boolean  @default(false) @map("canal_push")
+  alertTypes      String[] @map("alert_types") // codes des alertes activées, [] = toutes
+  quietHoursStart String?  @map("quiet_hours_start") // "22:00"
+  quietHoursEnd   String?  @map("quiet_hours_end")   // "08:00"
+  digestFrequency String   @default("realtime") @map("digest_frequency") // realtime, daily, weekly
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_notification_preferences")
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  endpoint  String   @db.Text
+  p256dh    String   @db.Text
+  auth      String   @db.Text
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, endpoint])
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  ipAddress    String?  @map("ip_address")
+  userAgent    String?  @map("user_agent")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// =============================================================================
+// RBAC - Profils, Permissions, Habilitations
+// =============================================================================
+
+model Profil {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  libelle     String
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  users       User[]
+  permissions ProfilPermission[]
+  menus       ProfilMenu[]
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  libelle     String
+  module      String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  profils     ProfilPermission[]
+}
+
+model ProfilPermission {
+  id           String   @id @default(cuid())
+  profilId     String   @map("profil_id")
+  permissionId String   @map("permission_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  profil       Profil     @relation(fields: [profilId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([profilId, permissionId])
+  @@map("profil_permissions")
+}
+
+// =============================================================================
+// MENUS DYNAMIQUES
+// =============================================================================
+
+model Menu {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  libelle     String
+  path        String?
+  icon        String?
+  ordre       Int      @default(0)
+  parentId    String?  @map("parent_id")
+  active      Boolean  @default(true)
+  permission  String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  parent      Menu?    @relation("MenuHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Menu[]   @relation("MenuHierarchy")
+  userMenus   UserMenu[]
+  profilMenus ProfilMenu[]
+}
+
+model ProfilMenu {
+  id        String   @id @default(cuid())
+  profilId  String   @map("profil_id")
+  menuId    String   @map("menu_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  profil     Profil  @relation(fields: [profilId], references: [id], onDelete: Cascade)
+  menu       Menu    @relation(fields: [menuId], references: [id], onDelete: Cascade)
+
+  @@unique([profilId, menuId])
+  @@map("profil_menus")
+}
+
+model UserMenu {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  menuId    String   @map("menu_id")
+  visible   Boolean  @default(true)
+  ordre     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  menu      Menu     @relation(fields: [menuId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, menuId])
+  @@map("user_menus")
+}
+
+// =============================================================================
+// MODULE DEVISES & CONVERSION
+// =============================================================================
+
+enum PositionSymbole {
+  BEFORE  // €100
+  AFTER   // 100 FCFA
+}
+
+enum SourceTaux {
+  MANUEL      // Saisi manuellement
+  API         // API externe (ex: exchangerate-api.com)
+  BCE         // Banque Centrale Européenne
+  BCEAO       // Banque Centrale États Afrique Ouest
+  CUSTOM      // Source personnalisée
+}
+
+model Devise {
+  id                String    @id @default(cuid())
+
+  // IDENTITÉ
+  code              String    @unique // ISO 4217 (XOF, EUR, USD...)
+  nom               String    // Franc CFA, Euro, Dollar US
+  symbole           String    // FCFA, €, $
+
+  // CONFIGURATION
+  isActive          Boolean   @default(true) @map("is_active")
+  isDefault         Boolean   @default(false) @map("is_default")
+
+  // FORMAT
+  decimales         Int       @default(0) @map("decimales") // 0 pour XOF, 2 pour EUR/USD
+  separateurMilliers String   @default(" ") @map("separateur_milliers") // espace pour XOF
+  separateurDecimal  String   @default(",") @map("separateur_decimal") // virgule
+  positionSymbole   PositionSymbole @default(AFTER) @map("position_symbole") // FCFA après le montant
+
+  // TAUX DE BASE (par rapport à XOF)
+  tauxVersXOF       Decimal   @default(1) @db.Decimal(15, 6) @map("taux_vers_xof")
+  // Exemple : 1 EUR = 655.957 XOF => tauxVersXOF = 655.957
+
+  // MÉTADONNÉES
+  pays              String[]  // ["Sénégal", "Mali", "Côte d'Ivoire"...]
+  description       String?
+
+  // RELATIONS
+  marches           Marche[]
+  tauxChanges       TauxChange[]
+
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@index([code])
+  @@index([isDefault])
+  @@map("devises")
+}
+
+model TauxChange {
+  id                String    @id @default(cuid())
+
+  // DEVISES
+  deviseSourceId    String    @map("devise_source_id")
+  deviseSource      Devise    @relation(fields: [deviseSourceId], references: [id], onDelete: Cascade)
+  deviseSourceCode  String    @map("devise_source_code") // XOF, EUR, USD (dénormalisé pour perf)
+
+  // TAUX
+  taux              Decimal   @db.Decimal(15, 6)
+  // Taux de conversion : 1 deviseSource = X XOF (devise de base)
+
+  // SOURCE DU TAUX
+  source            SourceTaux @default(MANUEL)
+
+  // VALIDITÉ
+  dateDebut         DateTime  @default(now()) @map("date_debut")
+  dateFin           DateTime? @map("date_fin")
+
+  // MÉTADONNÉES
+  notes             String?
+  createdBy         String?   @map("created_by")
+
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  @@index([deviseSourceId, dateDebut])
+  @@index([deviseSourceCode, dateDebut])
+  @@map("taux_changes")
+}
+
+// =============================================================================
+// MARCHÉS - Accomptes, Décaissements, Préfinancement
+// =============================================================================
+
+model Marche {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  libelle     String
+  dateDebut   DateTime? @map("date_debut")
+  dateFin     DateTime? @map("date_fin")
+  statut      String   @default("actif")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // DEVISE
+  deviseId          String   @map("devise_id")
+  devise            Devise   @relation(fields: [deviseId], references: [id])
+  deviseCode        String   @default("XOF") @map("devise_code") // Dénormalisé pour perf
+
+  // MONTANTS DANS DEVISE ORIGINALE
+  montantTotal          Decimal  @db.Decimal(15, 2) @map("montant_total")
+  montantEncaisse       Decimal  @default(0) @db.Decimal(15, 2) @map("montant_encaisse")
+  montantDecaisse       Decimal  @default(0) @db.Decimal(15, 2) @map("montant_decaisse")
+  tresorerieDisponible  Decimal  @default(0) @db.Decimal(15, 2) @map("tresorerie_disponible")
+
+  // MONTANTS EN XOF (DEVISE DE RÉFÉRENCE)
+  montantTotalXOF          Decimal  @db.Decimal(15, 2) @map("montant_total_xof")
+  montantEncaisseXOF       Decimal  @default(0) @db.Decimal(15, 2) @map("montant_encaisse_xof")
+  montantDecaisseXOF       Decimal  @default(0) @db.Decimal(15, 2) @map("montant_decaisse_xof")
+  tresorerieDisponibleXOF  Decimal  @default(0) @db.Decimal(15, 2) @map("tresorerie_disponible_xof")
+
+  // TAUX DE CHANGE À LA CRÉATION
+  tauxChangeCreation    Decimal  @db.Decimal(15, 6) @map("taux_change_creation")
+
+  accomptes       Accompte[]
+  decaissements   Decaissement[]
+  prefinancement  Prefinancement?
+
+  @@index([statut])
+  @@index([updatedAt(sort: Desc)])
+  @@index([deviseId])
+}
+
+model Accompte {
+  id                String   @id @default(cuid())
+  marcheId          String   @map("marche_id")
+  montant           Decimal  @db.Decimal(15, 2) // Montant dans devise du marché
+  montantXOF        Decimal  @db.Decimal(15, 2) @map("montant_xof") // Montant converti en XOF
+  tauxChange        Decimal  @db.Decimal(15, 6) @map("taux_change") // Taux utilisé
+  dateEncaissement  DateTime @map("date_encaissement")
+  reference         String?
+  description       String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  marche            Marche   @relation(fields: [marcheId], references: [id], onDelete: Cascade)
+
+  @@index([marcheId])
+  @@index([dateEncaissement(sort: Desc)])
+}
+
+enum StatutDecaissement {
+  PREVU   // En attente de validation
+  VALIDE  // Validé
+  PAYE    // Payé
+}
+
+model Decaissement {
+  id                String   @id @default(cuid())
+  marcheId          String   @map("marche_id")
+  montant           Decimal  @db.Decimal(15, 2) // Montant dans devise du marché
+  montantXOF        Decimal  @db.Decimal(15, 2) @map("montant_xof") // Montant converti en XOF
+  tauxChange        Decimal  @db.Decimal(15, 6) @map("taux_change") // Taux utilisé
+  dateDecaissement  DateTime @map("date_decaissement")
+  statut            StatutDecaissement @default(VALIDE)
+  reference         String?
+  description       String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  marche            Marche  @relation(fields: [marcheId], references: [id], onDelete: Cascade)
+
+  @@index([marcheId])
+  @@index([dateDecaissement(sort: Desc)])
+  @@index([statut])
+}
+
+model Prefinancement {
+  id                String   @id @default(cuid())
+  marcheId          String   @unique @map("marche_id")
+  montant           Decimal  @db.Decimal(15, 2)
+  montantXOF        Decimal  @db.Decimal(15, 2) @map("montant_xof")
+  tauxChange        Decimal  @db.Decimal(15, 6) @map("taux_change")
+  montantUtilise    Decimal  @default(0) @db.Decimal(15, 2) @map("montant_utilise")
+  montantUtiliseXOF Decimal  @default(0) @db.Decimal(15, 2) @map("montant_utilise_xof")
+  montantRestant    Decimal  @db.Decimal(15, 2) @map("montant_restant")
+  montantRestantXOF Decimal  @db.Decimal(15, 2) @map("montant_restant_xof")
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  marche            Marche   @relation(fields: [marcheId], references: [id], onDelete: Cascade)
+}
+
+// =============================================================================
+// DASHBOARDS & RAPPORTS PERSONNALISABLES
+// =============================================================================
+
+model Dashboard {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  libelle     String
+  config      Json?
+  profilId    String?  @map("profil_id")
+  userId      String?  @map("user_id")
+  isDefault   Boolean  @default(false) @map("is_default")
+  ordre       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+}
+
+model Rapport {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  libelle     String
+  type        String
+  config      Json?
+  template    String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  executions  RapportExecution[]
+  schedules   RapportSchedule[]
+}
+
+model RapportExecution {
+  id          String   @id @default(cuid())
+  rapportId   String?  @map("rapport_id")
+  rapportCode String   @map("rapport_code")
+  libelle     String
+  format      String   // pdf, excel, csv, json
+  config      Json?
+  filePath    String?  @map("file_path")
+  fileSize    Int?     @map("file_size")
+  status      String   @default("completed") // pending, running, completed, failed
+  error       String?
+  executedBy  String?  @map("executed_by")
+  executedAt  DateTime @default(now()) @map("executed_at")
+
+  rapport     Rapport? @relation(fields: [rapportId], references: [id], onDelete: SetNull)
+
+  @@index([executedAt(sort: Desc)])
+  @@index([rapportCode])
+  @@map("rapport_executions")
+}
+
+model RapportSchedule {
+  id            String   @id @default(cuid())
+  rapportId     String?  @map("rapport_id")
+  rapportCode   String   @map("rapport_code")
+  libelle       String
+  frequence     String   // daily, weekly, monthly
+  cronExpr      String?  @map("cron_expr")
+  config        Json?
+  recipients    String[] // emails
+  active        Boolean  @default(true)
+  lastRunAt     DateTime? @map("last_run_at")
+  nextRunAt     DateTime? @map("next_run_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  rapport       Rapport? @relation(fields: [rapportId], references: [id], onDelete: SetNull)
+
+  @@index([active])
+  @@map("rapport_schedules")
+}
+
+// =============================================================================
+// AUDIT TRAIL COMPLET
+// =============================================================================
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?  @map("user_id")
+  action      String
+  entity      String
+  entityId    String?  @map("entity_id")
+  description String?
+  oldData     Json?    @map("old_data")
+  newData     Json?    @map("new_data")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([userId])
+  @@index([entity, action])
+}
+
+// =============================================================================
+// SYSTÈME D'ALERTES AVANCÉ
+// =============================================================================
+
+model Alerte {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  libelle     String
+  description String?
+  canaux      String[] // email, sms, push, webhook
+  regle       Json?
+  seuils      Json?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  notifications Notification[]
+  alerteDestinataires AlerteDestinataire[]
+}
+
+model AlerteDestinataire {
+  id        String   @id @default(cuid())
+  alerteId  String   @map("alerte_id")
+  type      String   // user, groupe, email, phone
+  valeur    String
+  canal     String   // email, sms, push, webhook
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  alerte    Alerte   @relation(fields: [alerteId], references: [id], onDelete: Cascade)
+
+  @@map("alerte_destinataires")
+}
+
+model Notification {
+  id           String    @id @default(cuid())
+  alerteId     String    @map("alerte_id")
+  userId       String?   @map("user_id")
+  marcheId     String?   @map("marche_id")
+  canal        String
+  destinataire String
+  sujet        String?
+  corps        String
+  envoyee      Boolean   @default(false)
+  envoyeeAt    DateTime? @map("envoyee_at")
+  erreur       String?
+  lu           Boolean   @default(false)
+  luAt         DateTime? @map("lu_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  alerte      Alerte   @relation(fields: [alerteId], references: [id], onDelete: Cascade)
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model AlerteTemplate {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  libelle   String
+  canal     String
+  sujet     String?
+  corps     String
+  variables Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("alerte_templates")
+}
+
+// =============================================================================
+// CONFIGURATION SYSTÈME
+// =============================================================================
+
+model ConfigurationCanal {
+  id          String   @id @default(cuid())
+  canal       String   @unique // EMAIL, SMS, PUSH, WEBHOOK
+  isEnabled   Boolean  @default(false) @map("is_enabled")
+  credentials Json?
+  config      Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("configuration_canaux")
+}
+
+model Config {
+  id          String   @id @default(cuid())
+  cle         String   @unique
+  valeur      String
+  type        String   @default("string")
+  module      String?
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+}
+
+// =============================================================================
+// API KEYS - Accès externe
+// =============================================================================
+
+model ApiKey {
+  id          String   @id @default(cuid())
+  name        String
+  keyHash     String   @map("key_hash") // hash du key (jamais stocker le key brut)
+  keyPrefix   String   @map("key_prefix") // 4 premiers chars pour identification
+  scopes      String[] // marchers:read, alertes:trigger, etc.
+  expireAt    DateTime? @map("expire_at")
+  lastUsedAt  DateTime? @map("last_used_at")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  usages      ApiKeyUsage[]
+
+  @@index([keyPrefix])
+  @@index([active])
+  @@map("api_keys")
+}
+
+model ApiKeyUsage {
+  id        String   @id @default(cuid())
+  apiKeyId  String   @map("api_key_id")
+  endpoint  String
+  method    String
+  ipAddress String?  @map("ip_address")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  apiKey    ApiKey   @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@index([apiKeyId])
+  @@index([createdAt(sort: Desc)])
+  @@map("api_key_usages")
+}
+
+// =============================================================================
+// MONITORING & HEALTH CHECKS
+// =============================================================================
+
+model HealthCheck {
+  id          String   @id @default(cuid())
+  service     String
+  status      String
+  latencyMs   Int?     @map("latency_ms")
+  message     String?
+  metadata    Json?
+  checkedAt   DateTime @default(now()) @map("checked_at")
+
+  @@map("health_checks")
+}
+
+model Metric {
+  id        String   @id @default(cuid())
+  name      String
+  value     Decimal  @db.Decimal(20, 4)
+  labels    Json?
+  timestamp DateTime @default(now())
+}

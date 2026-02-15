@@ -8,6 +8,8 @@ const defaultOptions = {
     queries: {
       staleTime: 3 * 60 * 1000, // 3 min - évite les refetch inutiles à chaque navigation
       gcTime: 10 * 60 * 1000, // 10 min (anciennement cacheTime)
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
     },
   },
 };

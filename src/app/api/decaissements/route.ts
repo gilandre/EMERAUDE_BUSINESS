@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/get-session";
 import { hasPermission } from "@/lib/permissions";
 import { createDecaissementSchema } from "@/validations/decaissement.schema";
+import { cacheGet, cacheSet, cacheDelByPrefix } from "@/lib/cache";
 
 async function getSoldeMarche(marcheId: string): Promise<{ encaissements: number; decaissements: number; prefinancement: number }> {
   const [acc, dec, pre] = await Promise.all([
@@ -37,6 +38,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "marcheId requis" }, { status: 400 });
   }
 
+  const cacheKey = `decaissements:${marcheId}`;
+  const cached = await cacheGet<object>(cacheKey);
+  if (cached) return NextResponse.json(cached);
+
   const list = await prisma.decaissement.findMany({
     where: { marcheId },
     orderBy: { dateDecaissement: "desc" },
@@ -55,12 +60,13 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  return NextResponse.json(
-    list.map((d) => ({
-      ...d,
-      montant: Number(d.montant),
-    }))
-  );
+  const payload = list.map((d) => ({
+    ...d,
+    montant: Number(d.montant),
+  }));
+
+  await cacheSet(cacheKey, payload, 60);
+  return NextResponse.json(payload);
 }
 
 export async function POST(request: NextRequest) {
@@ -123,6 +129,8 @@ export async function POST(request: NextRequest) {
       );
     }
   }
+
+  void cacheDelByPrefix("decaissements");
 
   const decaissement = await prisma.decaissement.create({
     data: {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -68,6 +68,18 @@ export default function AdminUtilisateursPage() {
       return res.json();
     },
   });
+
+  // Prefetch next page
+  useEffect(() => {
+    if (data && page < (data.totalPages ?? 1)) {
+      const nextParams = new URLSearchParams({ page: String(page + 1), pageSize: "20" });
+      if (search) nextParams.set("search", search);
+      queryClient.prefetchQuery({
+        queryKey: ["admin-users", page + 1, search],
+        queryFn: () => fetch(`/api/users?${nextParams}`).then((r) => r.json()),
+      });
+    }
+  }, [data, page, search, queryClient]);
 
   const { data: profils } = useQuery({
     queryKey: ["profils"],

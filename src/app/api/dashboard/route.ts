@@ -99,14 +99,14 @@ async function getHandler(req: Request, _ctx: { params: Promise<Record<string, s
     decaissementsMoisPrecedent,
     accomptes30j,
     decaissements30j,
-    accomptes12m,
-    decaissements12m,
-    decaissementsTous,
+    accomptesParMois,
+    decaissements12mMerged,
     marchesAvecTresorerie,
     marchesFinProche,
     recentNotifications,
     recentAuditLogs,
     recentMarches,
+    alertesActivesCount,
   ] = await Promise.all([
     prisma.marche.count(),
     prisma.marche.count({ where: { statut: "actif" } }),
@@ -148,17 +148,26 @@ async function getHandler(req: Request, _ctx: { params: Promise<Record<string, s
       where: { dateDecaissement: { gte: thirtyDaysAgo } },
       select: { dateDecaissement: true, montantXOF: true },
     }),
-    prisma.accompte.findMany({
-      where: { dateEncaissement: { gte: twelveMonthsAgo } },
-      select: { dateEncaissement: true, montantXOF: true },
-    }),
+    // Monthly aggregation via raw SQL instead of loading all rows
+    prisma.$queryRaw<{ month: string; total: number }[]>`
+      SELECT TO_CHAR("date_encaissement", 'YYYY-MM') AS month,
+             COALESCE(SUM("montant_xof"::float8), 0) AS total
+      FROM "Accompte"
+      WHERE "date_encaissement" >= ${twelveMonthsAgo}
+      GROUP BY TO_CHAR("date_encaissement", 'YYYY-MM')
+    `,
+    // Merged decaissements12m + decaissementsTous into single query
     prisma.decaissement.findMany({
       where: { dateDecaissement: { gte: twelveMonthsAgo } },
-      select: { dateDecaissement: true, montantXOF: true, description: true, marche: { select: { deviseCode: true } } },
-    }),
-    prisma.decaissement.findMany({
-      where: { dateDecaissement: { gte: twelveMonthsAgo } },
-      select: { montantXOF: true, description: true, reference: true, beneficiaire: true, source: true, marche: { select: { deviseCode: true } } },
+      select: {
+        dateDecaissement: true,
+        montantXOF: true,
+        description: true,
+        reference: true,
+        beneficiaire: true,
+        source: true,
+        marche: { select: { deviseCode: true } },
+      },
     }),
     prisma.marche.findMany({
       where: { statut: "actif" },
@@ -220,6 +229,7 @@ async function getHandler(req: Request, _ctx: { params: Promise<Record<string, s
         _count: { select: { accomptes: true, decaissements: true } },
       },
     }),
+    prisma.alerte.count({ where: { active: true } }),
   ]);
 
   const totalAcc = Number(totalAccomptes._sum.montantXOF ?? 0);
@@ -262,11 +272,11 @@ async function getHandler(req: Request, _ctx: { params: Promise<Record<string, s
 
   const encByMonth: Record<string, number> = {};
   const decByMonth: Record<string, number> = {};
-  for (const a of accomptes12m) {
-    const k = monthKey(a.dateEncaissement);
-    encByMonth[k] = (encByMonth[k] ?? 0) + Number(a.montantXOF);
+  // Use pre-aggregated monthly data from raw SQL
+  for (const row of accomptesParMois) {
+    encByMonth[row.month] = Number(row.total);
   }
-  for (const d of decaissements12m) {
+  for (const d of decaissements12mMerged) {
     const k = monthKey(d.dateDecaissement);
     decByMonth[k] = (decByMonth[k] ?? 0) + Number(d.montantXOF);
   }
@@ -282,11 +292,11 @@ async function getHandler(req: Request, _ctx: { params: Promise<Record<string, s
   const categorySums: Record<string, number> = {};
   const deviseSums: Record<string, number> = {};
   const beneficiarySums: Record<string, number> = {};
-  for (const d of decaissementsTous) {
+  for (const d of decaissements12mMerged) {
     const cat = deriveCategory(d.description);
     const val = Number(d.montantXOF);
     categorySums[cat] = (categorySums[cat] ?? 0) + val;
-    const devise = (d as { marche?: { deviseCode?: string } }).marche?.deviseCode ?? "XOF";
+    const devise = d.marche?.deviseCode ?? "XOF";
     deviseSums[devise] = (deviseSums[devise] ?? 0) + val;
     const benef = (d.beneficiaire ?? "").trim() || "Non renseigné";
     beneficiarySums[benef] = (beneficiarySums[benef] ?? 0) + val;
@@ -366,7 +376,7 @@ async function getHandler(req: Request, _ctx: { params: Promise<Record<string, s
       totalDecaissements: totalDec,
       encEvolution,
       decEvolution,
-      alertesActives: await prisma.alerte.count({ where: { active: true } }),
+      alertesActives: alertesActivesCount,
       conversionRates,
     },
     chartData,

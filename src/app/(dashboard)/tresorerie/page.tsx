@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +17,11 @@ import {
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/utils";
 import { MontantDisplay } from "@/components/devises/MontantDisplay";
-import { TreasuryLineChart } from "@/components/dashboards/TreasuryLineChart";
+
+const TreasuryLineChart = dynamic(
+  () => import("@/components/dashboards/TreasuryLineChart").then((m) => ({ default: m.TreasuryLineChart })),
+  { loading: () => <Skeleton className="h-80 rounded-lg" /> }
+);
 
 type Period = "7d" | "30d" | "90d";
 

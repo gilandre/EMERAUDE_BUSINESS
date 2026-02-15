@@ -1,8 +1,9 @@
 "use client";
 
+import { useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
 interface MenuItem {
@@ -56,7 +57,15 @@ function MenuList({ items, level = 0 }: { items: MenuItem[]; level?: number }) {
   );
 }
 
+const prefetchMap: Record<string, { queryKey: string[]; url: string }> = {
+  "/dashboard": { queryKey: ["dashboard"], url: "/api/dashboard?period=30d" },
+  "/marches": { queryKey: ["marches", "1", "10", "", "prefetch"], url: "/api/marches?page=1&pageSize=10" },
+  "/tresorerie": { queryKey: ["tresorerie", "30d"], url: "/api/tresorerie?period=30d" },
+};
+
 export function DynamicMenu() {
+  const queryClient = useQueryClient();
+
   const { data: menus, isLoading } = useQuery<MenuItem[]>({
     queryKey: ["menus"],
     queryFn: async () => {
@@ -65,9 +74,21 @@ export function DynamicMenu() {
       return (await res.json()) as MenuItem[];
     },
     staleTime: 5 * 60 * 1000, // 5 min - menus changent rarement
+    placeholderData: [] as MenuItem[],
   });
 
   const pathname = usePathname();
+
+  const handleMouseEnter = useCallback((href: string) => {
+    const config = prefetchMap[href];
+    if (config) {
+      queryClient.prefetchQuery({
+        queryKey: config.queryKey,
+        queryFn: () => fetch(config.url).then((r) => r.json()),
+        staleTime: 3 * 60 * 1000,
+      });
+    }
+  }, [queryClient]);
 
   const defaultItemsUI = (
     <ul className="space-y-1">
@@ -80,6 +101,7 @@ export function DynamicMenu() {
               "block rounded-md px-3 py-2 text-sm hover:bg-muted",
               pathname === item.href && "bg-muted font-medium"
             )}
+            onMouseEnter={() => handleMouseEnter(item.href)}
           >
             {item.label}
           </Link>
@@ -88,7 +110,7 @@ export function DynamicMenu() {
     </ul>
   );
 
-  if (isLoading || !menus || menus.length === 0) {
+  if (!menus?.length) {
     return defaultItemsUI;
   }
 

@@ -93,7 +93,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
           montant: Number(existing.montant),
           statut: existing.statut,
         },
-        newData: data,
+        newData: data as Record<string, string | number | boolean | null>,
         description: `Frais de déplacement modifié: ${frais.libelle}`,
       },
     });

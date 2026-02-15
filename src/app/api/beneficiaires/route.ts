@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/get-session";
 import { hasPermission } from "@/lib/permissions";
 import { createBeneficiaireSchema } from "@/validations/beneficiaire.schema";
+import { cacheGet, cacheSet, cacheDelByPrefix } from "@/lib/cache";
 
 export async function GET(request: NextRequest) {
   const session = await getSession(request);
@@ -34,6 +35,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const cacheKey = `beneficiaires:${searchParams.toString()}`;
+    const cached = await cacheGet<object>(cacheKey);
+    if (cached) return NextResponse.json(cached);
+
     const [list, total] = await Promise.all([
       prisma.beneficiaire.findMany({
         where,
@@ -44,7 +49,7 @@ export async function GET(request: NextRequest) {
       prisma.beneficiaire.count({ where }),
     ]);
 
-    return NextResponse.json({
+    const payload = {
       data: list.map((b) => ({
         ...b,
         totalPaye: Number(b.totalPaye),
@@ -55,7 +60,10 @@ export async function GET(request: NextRequest) {
         total,
         totalPages: Math.ceil(total / limit),
       },
-    });
+    };
+
+    await cacheSet(cacheKey, payload, 60);
+    return NextResponse.json(payload);
   } catch (error) {
     console.error("Erreur GET beneficiaires:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
@@ -82,6 +90,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    void cacheDelByPrefix("beneficiaires");
+
     // Auto-generate code BEN-XXXX
     const lastBen = await prisma.beneficiaire.findFirst({
       where: { code: { startsWith: "BEN-" } },

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -15,16 +16,45 @@ import { MarcheKPICard } from "@/components/marches/MarcheKPICard";
 import { MarcheConversionWidget } from "@/components/marches/MarcheConversionWidget";
 import { RatioFinancierWidget } from "@/components/marches/RatioFinancierWidget";
 import { AlertesActivesWidget } from "@/components/marches/AlertesActivesWidget";
-import { AccomptesList } from "@/components/marches/AccomptesList";
-import { AccompteForm } from "@/components/marches/AccompteForm";
-import { DecaissementsList } from "@/components/marches/DecaissementsList";
-import { DecaissementForm } from "@/components/marches/DecaissementForm";
-import { PrefinancementPanel } from "@/components/marches/PrefinancementPanel";
-import { MarcheVueEnsembleTab } from "@/components/marches/MarcheVueEnsembleTab";
-import { MarcheAlertesTab } from "@/components/marches/MarcheAlertesTab";
-import { MarcheHistoriqueTab } from "@/components/marches/MarcheHistoriqueTab";
-import { MarcheForm } from "@/components/marches/MarcheForm";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+
+// Dynamic imports for heavy tab components
+const AccomptesList = dynamic(
+  () => import("@/components/marches/AccomptesList").then((m) => ({ default: m.AccomptesList })),
+  { loading: () => <Skeleton className="h-64 w-full" /> }
+);
+const AccompteForm = dynamic(
+  () => import("@/components/marches/AccompteForm").then((m) => ({ default: m.AccompteForm })),
+  { loading: () => <Skeleton className="h-32 w-full" /> }
+);
+const DecaissementsList = dynamic(
+  () => import("@/components/marches/DecaissementsList").then((m) => ({ default: m.DecaissementsList })),
+  { loading: () => <Skeleton className="h-64 w-full" /> }
+);
+const DecaissementForm = dynamic(
+  () => import("@/components/marches/DecaissementForm").then((m) => ({ default: m.DecaissementForm })),
+  { loading: () => <Skeleton className="h-32 w-full" /> }
+);
+const PrefinancementPanel = dynamic(
+  () => import("@/components/marches/PrefinancementPanel").then((m) => ({ default: m.PrefinancementPanel })),
+  { loading: () => <Skeleton className="h-64 w-full" /> }
+);
+const MarcheVueEnsembleTab = dynamic(
+  () => import("@/components/marches/MarcheVueEnsembleTab").then((m) => ({ default: m.MarcheVueEnsembleTab })),
+  { loading: () => <Skeleton className="h-64 w-full" /> }
+);
+const MarcheAlertesTab = dynamic(
+  () => import("@/components/marches/MarcheAlertesTab").then((m) => ({ default: m.MarcheAlertesTab })),
+  { loading: () => <Skeleton className="h-64 w-full" /> }
+);
+const MarcheHistoriqueTab = dynamic(
+  () => import("@/components/marches/MarcheHistoriqueTab").then((m) => ({ default: m.MarcheHistoriqueTab })),
+  { loading: () => <Skeleton className="h-64 w-full" /> }
+);
+const MarcheForm = dynamic(
+  () => import("@/components/marches/MarcheForm").then((m) => ({ default: m.MarcheForm })),
+  { loading: () => <Skeleton className="h-64 w-full" /> }
+);
 
 export default function MarcheDetailPage() {
   const params = useParams();

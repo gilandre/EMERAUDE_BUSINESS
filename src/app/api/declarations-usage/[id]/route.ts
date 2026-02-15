@@ -145,7 +145,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         entity: "DeclarationUsage",
         entityId: declaration.id,
         oldData: { statut: existing.statut },
-        newData: data,
+        newData: data as Record<string, string | number | boolean | null>,
         description: `Déclaration d'usage modifiée: ${declaration.reference} - Statut: ${existing.statut} -> ${declaration.statut}`,
       },
     });

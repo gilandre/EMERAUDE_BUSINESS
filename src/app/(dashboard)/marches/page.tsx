@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +40,7 @@ function buildParams(
 const PAGE_SIZES = [10, 20, 50, 100];
 
 export default function MarchesListPage() {
+  const queryClient = useQueryClient();
   const containerRef = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -72,6 +73,17 @@ export default function MarchesListPage() {
     },
     retry: 1,
   });
+
+  // Prefetch next page
+  useEffect(() => {
+    if (data && page < (data.totalPages ?? 0)) {
+      const nextParams = buildParams(page + 1, pageSize, q, filtersApplied, sortBy, sortOrder);
+      queryClient.prefetchQuery({
+        queryKey: ["marches", page + 1, pageSize, q, filtersApplied, sortBy, sortOrder],
+        queryFn: () => fetch(`/api/marches?${nextParams}`).then((r) => r.json()),
+      });
+    }
+  }, [data, page, pageSize, q, filtersApplied, sortBy, sortOrder, queryClient]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

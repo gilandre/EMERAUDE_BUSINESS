@@ -109,7 +109,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         entity: "Beneficiaire",
         entityId: beneficiaire.id,
         oldData: { nom: existing.nom, type: existing.type },
-        newData: data,
+        newData: data as Record<string, string | number | boolean | null>,
         description: `Bénéficiaire modifié: ${beneficiaire.nom} (${beneficiaire.code})`,
       },
     });

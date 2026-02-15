@@ -120,6 +120,9 @@ const withPWA = require("@ducanh2912/next-pwa").default({
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  compiler: {
+    removeConsole: process.env.NODE_ENV === "production" ? { exclude: ["error", "warn"] } : false,
+  },
   serverExternalPackages: ["jose", "ioredis", "bullmq", "sonner"],
   webpack: (config) => {
     return config;

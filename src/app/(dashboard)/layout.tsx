@@ -9,9 +9,6 @@ import { OfflineBanner } from "@/components/pwa/OfflineBanner";
 import { MobileWebWarning } from "@/components/pwa/MobileWebWarning";
 import { NotificationToaster } from "@/components/notifications/NotificationToaster";
 
-/** Évite la pré-rendu statique (conflit React Query / useEffect lors du build). */
-export const dynamic = "force-dynamic";
-
 export default function DashboardLayout({
   children,
 }: {

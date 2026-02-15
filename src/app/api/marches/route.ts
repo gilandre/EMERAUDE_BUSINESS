@@ -7,6 +7,7 @@ import { createMarcheSchema } from "@/validations/marche.schema";
 import { sanitizeString } from "@/lib/sanitize";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { conversionService } from "@/services/devises/conversion.service";
+import { cacheGet, cacheSet, cacheDelByPrefix } from "@/lib/cache";
 
 export async function GET(request: NextRequest) {
   const rateLimitRes = await consumeRateLimit(request);
@@ -23,6 +24,10 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
+
+  const cacheKey = `marches:${searchParams.toString()}`;
+  const cached = await cacheGet<object>(cacheKey);
+  if (cached) return NextResponse.json(cached);
   const q = searchParams.get("q") ?? "";
   const statutParam = searchParams.get("statut") ?? "";
   const statutList = statutParam ? statutParam.split(",").filter(Boolean) : [];
@@ -155,14 +160,17 @@ export async function GET(request: NextRequest) {
     };
   }
 
-  return NextResponse.json({
+  const payload = {
     data: paginatedItems,
     total,
     page,
     pageSize,
     totalPages: Math.ceil(total / pageSize),
     counts,
-  });
+  };
+
+  await cacheSet(cacheKey, payload, 60);
+  return NextResponse.json(payload);
 }
 
 export async function POST(request: NextRequest) {
@@ -200,6 +208,8 @@ export async function POST(request: NextRequest) {
 
   const tauxChange = await conversionService.getTauxChange(codeDevise);
   const montantTotalXOF = await conversionService.convertirVersXOF(montantVal, codeDevise);
+
+  void cacheDelByPrefix("marches");
 
   const marche = await prisma.marche.create({
     data: {

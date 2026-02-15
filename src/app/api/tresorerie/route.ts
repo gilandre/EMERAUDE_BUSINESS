@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { conversionService } from "@/services/devises/conversion.service";
 import { withApiMetrics, type RouteContext } from "@/lib/api-metrics";
+import { cacheGet, cacheSet } from "@/lib/cache";
 
 type Period = "7d" | "30d" | "90d";
 
@@ -44,6 +45,10 @@ async function getHandler(req: Request, _ctx: RouteContext) {
 
   const { searchParams } = new URL(req.url);
   const period = (searchParams.get("period") ?? "30d") as Period;
+
+  const cacheKey = `tresorerie:${period}`;
+  const cached = await cacheGet<object>(cacheKey);
+  if (cached) return NextResponse.json(cached);
 
   const { start, end } = getDateRange(period);
   const daysCount = Math.ceil((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
@@ -209,7 +214,7 @@ async function getHandler(req: Request, _ctx: RouteContext) {
   const tauxEUR = await conversionService.getTauxChange("EUR");
   const tauxUSD = await conversionService.getTauxChange("USD");
 
-  return NextResponse.json({
+  const payload = {
     synthese: {
       totalEncaissements: totalEnc,
       totalDecaissements: totalDec,
@@ -225,7 +230,10 @@ async function getHandler(req: Request, _ctx: RouteContext) {
       USD: Number(tauxUSD.toString()),
     },
     period,
-  });
+  };
+
+  await cacheSet(cacheKey, payload, 120);
+  return NextResponse.json(payload);
 }
 
 export const GET = withApiMetrics(getHandler, "api/tresorerie");

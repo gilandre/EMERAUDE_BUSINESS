@@ -1,8 +1,29 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+  TouchableOpacity,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Card } from '../components/Card';
-import { colors, typography, spacing } from '../theme';
+import {
+  Wallet,
+  Bell,
+  Briefcase,
+  ArrowDownLeft,
+  CreditCard,
+  FileText,
+  BellRing,
+  AlertTriangle,
+  Calendar,
+  Search,
+} from 'lucide-react-native';
+import { ProgressBar } from '../components/ProgressBar';
+import { typography, spacing } from '../theme';
+import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api/client';
 
 interface DashboardData {
@@ -25,6 +46,7 @@ interface DashboardData {
     montantXOF?: number;
     deviseCode: string;
     statut: string;
+    _count?: { accomptes: number; decaissements: number };
   }>;
   marchesAttention?: Array<{
     id: string;
@@ -36,11 +58,21 @@ interface DashboardData {
   }>;
   treasuryEvolution?: Array<{ date: string; tresorerie: number }>;
   deadlines?: Array<{ id: string; code: string; libelle: string; dateFin: string }>;
+  recentAlerts?: Array<{
+    id: string;
+    sujet: string;
+    libelle: string;
+    createdAt: string;
+  }>;
   seuilCritique?: number;
 }
 
+const DAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+
 export function DashboardScreen() {
   const navigation = useNavigation();
+  const { colors, isDark } = useTheme();
+  const { user } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -49,7 +81,7 @@ export function DashboardScreen() {
     try {
       const res = await apiFetch<DashboardData>('/api/dashboard?period=30d');
       setData(res);
-    } catch (e) {
+    } catch {
       setData(null);
     } finally {
       setLoading(false);
@@ -68,373 +100,743 @@ export function DashboardScreen() {
 
   const formatMontant = (n: number, devise = 'XOF') => {
     const fmt = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(n);
-    return `${fmt} ${devise === 'XOF' ? 'FCFA' : devise}`;
+    return { value: fmt, suffix: devise === 'XOF' ? 'FCFA' : devise };
   };
 
-  const formatEvolution = (n: number | undefined) => {
-    if (n === undefined || n === 0) return '';
-    const sign = n > 0 ? '+' : '';
-    return `${sign}${n.toFixed(0)}%`;
+  const formatShort = (n: number) => {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+    return String(n);
+  };
+
+  const formatTimeAgo = (d: string) => {
+    const date = new Date(d);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffH = Math.floor(diffMs / (1000 * 60 * 60));
+    if (diffH < 1) return 'À l\'instant';
+    if (diffH < 24) return `Il y a ${diffH}h`;
+    const diffD = Math.floor(diffH / 24);
+    return `Il y a ${diffD}j`;
+  };
+
+  const navigateToMarche = (id: string) => {
+    (navigation as any).navigate('Marches', { screen: 'MarcheDetail', params: { id } });
   };
 
   if (loading && !data) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.loadingText}>Chargement...</Text>
+      <View style={[st.centered, { backgroundColor: colors.background }]}>
+        <Text style={[st.loadingText, { color: colors.textSecondary }]}>Chargement...</Text>
       </View>
     );
   }
 
   const kpis = data?.kpis ?? {};
-  const marches = data?.recentMarches ?? [];
   const marchesAttention = data?.marchesAttention ?? [];
+  const recentMarches = data?.recentMarches ?? [];
   const deadlines = data?.deadlines ?? [];
+  const recentAlerts = data?.recentAlerts ?? [];
   const treasuryEvolution = data?.treasuryEvolution ?? [];
-
-  // Mini bar chart data (last 7 days)
   const last7 = treasuryEvolution.slice(-7);
   const maxTreasury = Math.max(...last7.map((p) => Math.abs(p.tresorerie)), 1);
+  const tresoEvo = kpis.encEvolution ?? 0;
+  const displayName = user?.name || [user?.prenom, user?.nom].filter(Boolean).join(' ') || 'Utilisateur';
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+
+  // Determine which marchés to show in the watch section
+  const watchMarches = marchesAttention.length > 0
+    ? marchesAttention.slice(0, 3).map((m) => ({
+        id: m.id,
+        libelle: m.libelle,
+        code: m.code,
+        ratio: m.ratio,
+        progress: Math.min(1, m.ratio),
+      }))
+    : recentMarches.slice(0, 3).map((m) => ({
+        id: m.id,
+        libelle: m.libelle,
+        code: m.code,
+        ratio: null as number | null,
+        progress: m._count
+          ? Math.min(1, ((m._count.accomptes + m._count.decaissements) / 10))
+          : 0.5,
+      }));
+
+  // Alert icon mapping
+  const getAlertIcon = (sujet: string): { icon: React.ReactNode; bg: string; color: string } => {
+    if (sujet.includes('Décaissement')) return { icon: <CreditCard size={16} color="#f59e0b" />, bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' };
+    if (sujet.includes('Accompte') || sujet.includes('encaiss')) return { icon: <ArrowDownLeft size={16} color="#10b77f" />, bg: 'rgba(16,183,127,0.15)', color: '#10b77f' };
+    if (sujet.includes('marché') || sujet.includes('Nouveau')) return { icon: <FileText size={16} color="#6366f1" />, bg: 'rgba(99,102,241,0.15)', color: '#6366f1' };
+    return { icon: <BellRing size={16} color={colors.primary} />, bg: colors.primaryTint, color: colors.primary };
+  };
 
   return (
     <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
+      style={[st.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={st.content}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
       }
     >
-      <Text style={styles.title}>Tableau de bord</Text>
-
-      {/* KPI Grid */}
-      <View style={styles.kpiGrid}>
-        <Card style={styles.kpiCard}>
-          <Text style={styles.kpiValue}>{kpis.marchesActifs ?? 0}</Text>
-          <Text style={styles.kpiLabel}>Marchés actifs</Text>
-          {kpis.marchesActifsDelta !== undefined && kpis.marchesActifsDelta !== 0 && (
-            <Text style={[styles.kpiDelta, kpis.marchesActifsDelta > 0 ? styles.deltaPositive : styles.deltaNegative]}>
-              {kpis.marchesActifsDelta > 0 ? '+' : ''}{kpis.marchesActifsDelta}
-            </Text>
-          )}
-        </Card>
-        <Card style={styles.kpiCard}>
-          <Text style={styles.kpiValueSmall}>
-            {formatMontant(Number(kpis.totalEncaissements) || 0)}
+      {/* Header */}
+      <View style={st.header}>
+        <View style={st.headerLeft}>
+          <Text style={[st.headerTitle, { color: colors.text }]}>Tableau de bord</Text>
+          <Text style={[st.headerDate, { color: colors.textMuted }]}>
+            {dateStr.charAt(0).toUpperCase() + dateStr.slice(1)}
           </Text>
-          <Text style={styles.kpiLabel}>Encaissements</Text>
-          {kpis.encEvolution !== undefined && kpis.encEvolution !== 0 && (
-            <Text style={[styles.kpiDelta, kpis.encEvolution > 0 ? styles.deltaPositive : styles.deltaNegative]}>
-              {formatEvolution(kpis.encEvolution)}
+        </View>
+        <View style={st.headerRight}>
+          <TouchableOpacity
+            style={[st.bellButton, { backgroundColor: isDark ? colors.surface : colors.borderLight }]}
+            onPress={() => (navigation as any).navigate('AlertesList')}
+            activeOpacity={0.7}
+          >
+            <Bell size={20} color={colors.textMuted} />
+          </TouchableOpacity>
+          <View style={[st.avatarSmall, { borderColor: 'rgba(16,183,127,0.2)' }]}>
+            <Text style={[st.avatarSmallText, { color: colors.primary }]}>
+              {displayName.charAt(0).toUpperCase()}
             </Text>
-          )}
-        </Card>
-        <Card style={styles.kpiCard}>
-          <Text style={styles.kpiValueSmall}>
-            {formatMontant(Number(kpis.totalDecaissements) || 0)}
-          </Text>
-          <Text style={styles.kpiLabel}>Décaissements</Text>
-          {kpis.decEvolution !== undefined && kpis.decEvolution !== 0 && (
-            <Text style={[styles.kpiDelta, kpis.decEvolution > 0 ? styles.deltaNegative : styles.deltaPositive]}>
-              {formatEvolution(kpis.decEvolution)}
-            </Text>
-          )}
-        </Card>
+            <View style={[st.onlineDot, { borderColor: isDark ? colors.background : '#fff' }]} />
+          </View>
+        </View>
       </View>
 
-      {/* Trésorerie + Alertes */}
-      <View style={styles.twoCol}>
-        <Card style={styles.twoColCard}>
-          <Text style={styles.cardTitle}>Trésorerie</Text>
-          <Text style={styles.tresorerieValue}>
-            {formatMontant(Number(kpis.tresorerie) || 0)}
+      {/* Hero Treasury Card */}
+      <View style={st.heroCard}>
+        <View style={st.heroTop}>
+          <Text style={st.heroLabel}>Solde Trésorerie</Text>
+          <Wallet size={24} color="rgba(255,255,255,0.8)" />
+        </View>
+        <View style={st.heroAmountRow}>
+          <Text style={st.heroValue}>
+            {formatMontant(Number(kpis.tresorerie) || 0).value}
           </Text>
-        </Card>
-        <Card style={styles.twoColCard}>
-          <Text style={styles.cardTitle}>Alertes actives</Text>
-          <Text style={[styles.tresorerieValue, { color: (kpis.alertesActives ?? 0) > 0 ? colors.warning : colors.success }]}>
-            {kpis.alertesActives ?? 0}
+          <Text style={st.heroSuffix}>
+            {' '}{formatMontant(Number(kpis.tresorerie) || 0).suffix}
           </Text>
-        </Card>
+        </View>
+        {tresoEvo !== 0 ? (
+          <View style={st.heroBadge}>
+            <Text style={st.heroBadgeText}>
+              ↗ {tresoEvo > 0 ? '+' : ''}{tresoEvo.toFixed(1)}% ce mois
+            </Text>
+          </View>
+        ) : (kpis.alertesActives ?? 0) > 0 ? (
+          <View style={st.heroBadge}>
+            <Text style={st.heroBadgeText}>
+              ⚡ {kpis.alertesActives} alertes actives
+            </Text>
+          </View>
+        ) : null}
       </View>
 
-      {/* Mini Treasury Chart (7 jours) */}
+      {/* KPI Grid - 2 columns */}
+      <View style={st.kpiGrid}>
+        <View style={[st.kpiCard, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
+          <Text style={[st.kpiLabel, { color: colors.textMuted }]}>Marchés Actifs</Text>
+          <Text style={[st.kpiValue, { color: isDark ? colors.primary : colors.primary }]}>
+            {kpis.marchesActifs ?? 0}
+          </Text>
+          {(kpis.marchesActifsDelta ?? 0) > 0 && (
+            <Text style={[st.kpiSub, { color: colors.textMuted }]}>
+              {kpis.marchesActifsDelta} nouveaux ce mois
+            </Text>
+          )}
+        </View>
+        <View style={[st.kpiCard, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
+          <Text style={[st.kpiLabel, { color: colors.textMuted }]}>Recettes (Mois)</Text>
+          <View style={st.kpiAmountRow}>
+            <Text style={[st.kpiValue, { color: isDark ? '#fff' : colors.text }]}>
+              {formatShort(Number(kpis.totalEncaissements) || 0)}
+            </Text>
+            <Text style={[st.kpiSuffix, { color: colors.textMuted }]}> FCFA</Text>
+          </View>
+          {(kpis.encEvolution ?? 0) !== 0 && (
+            <Text style={[st.kpiEvolution, { color: colors.primary }]}>
+              ↑ +{Math.abs(kpis.encEvolution ?? 0).toFixed(0)}%
+            </Text>
+          )}
+        </View>
+      </View>
+
+      {/* Treasury Chart */}
       {last7.length > 0 && (
-        <Card>
-          <Text style={styles.cardTitle}>Trésorerie (7 derniers jours)</Text>
-          <View style={styles.miniChart}>
-            {last7.map((pt, i) => {
-              const height = Math.max(4, (Math.abs(pt.tresorerie) / maxTreasury) * 50);
-              const isNegative = pt.tresorerie < 0;
+        <View style={st.sectionBlock}>
+          <View style={st.sectionHeaderRow}>
+            <Text style={[st.sectionTitle, { color: colors.text }]}>
+              Flux de trésorerie{' '}
+              <Text style={[st.sectionTitleLight, { color: colors.textMuted }]}>(7j)</Text>
+            </Text>
+            <Text style={[st.detailsLink, { color: colors.primary }]}>Détails</Text>
+          </View>
+          <View style={[st.chartCard, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
+            <View style={st.chartBars}>
+              {last7.map((pt, i) => {
+                const pct = maxTreasury === 0
+                  ? 15
+                  : Math.max(5, (Math.abs(pt.tresorerie) / maxTreasury) * 100);
+                const isMax = maxTreasury > 0 && Math.abs(pt.tresorerie) === maxTreasury;
+                const dayLabel = DAY_LABELS[i] || pt.date.slice(8);
+                return (
+                  <View key={i} style={st.barCol}>
+                    <View style={st.barTrack}>
+                      <View
+                        style={[
+                          st.bar,
+                          {
+                            height: `${pct}%`,
+                            backgroundColor: isMax
+                              ? colors.primary
+                              : isDark
+                              ? 'rgba(16, 183, 127, 0.4)'
+                              : `rgba(16, 183, 127, ${0.15 + (pct / 100) * 0.5})`,
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text
+                      style={[
+                        st.barLabel,
+                        { color: isMax ? colors.primary : colors.textMuted },
+                        isMax && st.barLabelBold,
+                      ]}
+                    >
+                      {dayLabel}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Marchés à surveiller */}
+      {watchMarches.length > 0 && (
+        <View style={st.sectionBlock}>
+          <Text style={[st.sectionTitle, { color: colors.text }]}>Marchés à surveiller</Text>
+          {watchMarches.map((m) => {
+            const hasRatio = m.ratio !== null;
+            const ratioVal = m.ratio ?? 1;
+            const ratioColor = ratioVal < 1 ? '#f59e0b' : colors.primary;
+            const ratioBg = ratioVal < 1
+              ? isDark ? 'rgba(245, 158, 11, 0.15)' : '#fef3c7'
+              : isDark ? colors.primaryTint : 'rgba(16, 183, 127, 0.1)';
+            return (
+              <TouchableOpacity
+                key={m.id}
+                activeOpacity={0.8}
+                onPress={() => navigateToMarche(m.id)}
+              >
+                <View style={[st.watchCard, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
+                  <View style={st.watchTop}>
+                    <View style={st.watchInfo}>
+                      <Text style={[st.watchTitle, { color: colors.text }]}>{m.libelle}</Text>
+                      <Text style={[st.watchCode, { color: colors.textMuted }]}>Contrat #{m.code}</Text>
+                    </View>
+                    {hasRatio && (
+                      <View style={[st.ratioBadge, { backgroundColor: ratioBg }]}>
+                        <Text style={[st.ratioText, { color: ratioColor }]}>
+                          Ratio: {ratioVal.toFixed(1)}x
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={st.progressSection}>
+                    <View style={st.progressLabelRow}>
+                      <Text style={[st.progressLabel, { color: colors.textMuted }]}>Progression</Text>
+                      <Text style={[st.progressLabel, { color: colors.textMuted }]}>
+                        {Math.round(m.progress * 100)}%
+                      </Text>
+                    </View>
+                    <ProgressBar
+                      progress={m.progress}
+                      color={colors.primary}
+                      trackColor={isDark ? '#1e3a31' : '#f1f5f9'}
+                    />
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
+      {/* Prochaines échéances */}
+      <View style={st.sectionBlock}>
+        <View style={st.sectionHeaderRow}>
+          <Text style={[st.sectionTitle, { color: colors.text }]}>Prochaines échéances</Text>
+          <Text style={[st.seeAll, { color: colors.textMuted }]}>Voir tout</Text>
+        </View>
+        {deadlines.length > 0 ? (
+          <View style={[st.deadlineCard, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
+            {deadlines.slice(0, 4).map((d, idx) => {
+              const dt = new Date(d.dateFin);
+              const month = dt.toLocaleDateString('fr-FR', { month: 'short' }).toUpperCase();
+              const day = dt.getDate();
+              const isUrgent = idx === 0;
+              const calBg = isUrgent
+                ? isDark ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2'
+                : isDark ? colors.surface : '#f8fafc';
+              const calColor = isUrgent ? '#ef4444' : isDark ? colors.textMuted : '#64748b';
               return (
-                <View key={i} style={styles.barContainer}>
-                  <View
-                    style={[
-                      styles.bar,
-                      { height, backgroundColor: isNegative ? colors.error : colors.success },
-                    ]}
-                  />
-                  <Text style={styles.barLabel}>{pt.date.slice(8)}</Text>
+                <TouchableOpacity
+                  key={d.id}
+                  activeOpacity={0.8}
+                  onPress={() => navigateToMarche(d.id)}
+                  style={[
+                    st.deadlineRow,
+                    idx < deadlines.slice(0, 4).length - 1 && {
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.borderLight,
+                    },
+                  ]}
+                >
+                  <View style={[st.calendarBox, { backgroundColor: calBg }]}>
+                    <Text style={[st.calMonth, { color: calColor }]}>{month}</Text>
+                    <Text style={[st.calDay, { color: calColor }]}>{day}</Text>
+                  </View>
+                  <View style={st.deadlineInfo}>
+                    <Text style={[st.deadlineTitle, { color: colors.text }]}>{d.libelle}</Text>
+                    <Text style={[st.deadlineCode, { color: colors.textMuted }]}>{d.code}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ) : (
+          <View style={[st.emptyCard, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
+            <View style={st.emptyIconWrap}>
+              <Calendar size={32} color={colors.textMuted} />
+            </View>
+            <Text style={[st.emptyText, { color: colors.textSecondary }]}>
+              Aucune échéance proche
+            </Text>
+            <Text style={[st.emptySubtext, { color: colors.textMuted }]}>
+              Les échéances de vos marchés apparaîtront ici
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Alertes récentes */}
+      <View style={st.sectionBlock}>
+        <View style={st.sectionHeaderRow}>
+          <Text style={[st.sectionTitle, { color: colors.text }]}>Alertes récentes</Text>
+          <TouchableOpacity onPress={() => (navigation as any).navigate('Alertes')}>
+            <Text style={[st.detailsLink, { color: colors.primary }]}>Tout voir</Text>
+          </TouchableOpacity>
+        </View>
+        {recentAlerts.length > 0 ? (
+          <View style={[st.alertsCard, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
+            {recentAlerts.slice(0, 4).map((a, idx) => {
+              const alertStyle = getAlertIcon(a.sujet);
+              return (
+                <View
+                  key={a.id}
+                  style={[
+                    st.alertRow,
+                    idx < recentAlerts.slice(0, 4).length - 1 && {
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.borderLight,
+                    },
+                  ]}
+                >
+                  <View style={[st.alertIconCircle, { backgroundColor: alertStyle.bg }]}>
+                    {alertStyle.icon}
+                  </View>
+                  <View style={st.alertInfo}>
+                    <Text style={[st.alertTitle, { color: colors.text }]}>{a.sujet}</Text>
+                    <Text style={[st.alertTime, { color: colors.textMuted }]}>
+                      {formatTimeAgo(a.createdAt)}
+                    </Text>
+                  </View>
                 </View>
               );
             })}
           </View>
-        </Card>
-      )}
+        ) : (
+          <View style={[st.emptyCard, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
+            <View style={st.emptyIconWrap}>
+              <Bell size={32} color={colors.textMuted} />
+            </View>
+            <Text style={[st.emptyText, { color: colors.textSecondary }]}>
+              Aucune alerte récente
+            </Text>
+          </View>
+        )}
+      </View>
 
-      {/* Marchés nécessitant attention */}
-      {marchesAttention.length > 0 && (
-        <>
-          <Text style={styles.sectionTitle}>Marchés nécessitant attention</Text>
-          {marchesAttention.slice(0, 3).map((m) => (
-            <TouchableOpacity
-              key={m.id}
-              activeOpacity={0.8}
-              onPress={() => (navigation as { navigate: (s: string, p: { id: string }) => void }).navigate('MarcheDetail', { id: m.id })}
-            >
-              <Card>
-                <Text style={styles.attentionLibelle}>{m.libelle}</Text>
-                <Text style={styles.attentionCode}>{m.code}</Text>
-                <View style={styles.attentionRow}>
-                  <Text style={styles.attentionTreso}>
-                    Trésorerie: {formatMontant(m.tresorerie)}
-                  </Text>
-                  <Text style={[styles.attentionRatio, m.ratio < 5 && styles.ratioCritical]}>
-                    {m.ratio.toFixed(0)}%
-                  </Text>
-                </View>
-              </Card>
-            </TouchableOpacity>
-          ))}
-        </>
-      )}
-
-      {/* Échéances proches */}
-      {deadlines.length > 0 && (
-        <>
-          <Text style={styles.sectionTitle}>Échéances proches</Text>
-          {deadlines.map((d) => (
-            <TouchableOpacity
-              key={d.id}
-              activeOpacity={0.8}
-              onPress={() => (navigation as { navigate: (s: string, p: { id: string }) => void }).navigate('MarcheDetail', { id: d.id })}
-            >
-              <Card>
-                <Text style={styles.deadlineLibelle}>{d.libelle}</Text>
-                <Text style={styles.deadlineDate}>
-                  Fin : {new Date(d.dateFin).toLocaleDateString('fr-FR')}
-                </Text>
-              </Card>
-            </TouchableOpacity>
-          ))}
-        </>
-      )}
-
-      {/* Marchés récents */}
-      <TouchableOpacity
-        onPress={() => (navigation as { navigate: (s: string) => void }).navigate('Marches')}
-        style={styles.marchesLink}
-      >
-        <Text style={styles.sectionTitle}>Marchés récents</Text>
-        <Text style={styles.voirTout}>Voir tout</Text>
-      </TouchableOpacity>
-      {marches.length === 0 ? (
-        <Card>
-          <Text style={styles.emptyText}>Aucun marché</Text>
-        </Card>
-      ) : (
-        marches.map((m) => (
-          <TouchableOpacity
-            key={m.id}
-            activeOpacity={0.8}
-            onPress={() => (navigation as { navigate: (s: string, p: { id: string }) => void }).navigate('MarcheDetail', { id: m.id })}
-          >
-            <Card>
-              <Text style={styles.marcheLibelle}>{m.libelle}</Text>
-              <Text style={styles.marcheCode}>{m.code}</Text>
-              <Text style={styles.marcheMontant}>
-                {formatMontant(m.montantXOF ?? m.montant, m.deviseCode)}
-              </Text>
-            </Card>
-          </TouchableOpacity>
-        ))
-      )}
+      <View style={{ height: spacing.xxl }} />
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
+const st = StyleSheet.create({
+  container: { flex: 1 },
   content: {
-    padding: spacing.md,
-    paddingBottom: spacing.xxl,
+    padding: spacing.mld,
+    paddingBottom: spacing.xxl * 2,
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingText: {
-    color: colors.textSecondary,
-  },
-  title: {
-    fontSize: typography.fontSizes.xxl,
-    fontWeight: typography.fontWeights.bold as '700',
-    color: colors.text,
+  loadingText: { fontFamily: typography.fontFamily.regular },
+
+  // Header
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: spacing.lg,
   },
+  headerLeft: {},
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  bellButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: typography.fontSizes.xxl,
+    fontFamily: typography.fontFamily.bold,
+    fontWeight: '700',
+  },
+  headerDate: {
+    fontSize: typography.fontSizes.xs,
+    fontFamily: typography.fontFamily.medium,
+    marginTop: 2,
+  },
+  avatarSmall: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(16, 183, 127, 0.1)',
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  avatarSmallText: {
+    fontSize: typography.fontSizes.base,
+    fontFamily: typography.fontFamily.bold,
+  },
+  onlineDot: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#10b77f',
+    borderWidth: 2,
+  },
+
+  // Hero
+  heroCard: {
+    backgroundColor: '#10b77f',
+    borderRadius: 16,
+    padding: spacing.mld,
+    marginBottom: spacing.md,
+    shadowColor: '#10b77f',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  heroTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.xs,
+  },
+  heroLabel: {
+    fontSize: typography.fontSizes.sm,
+    fontFamily: typography.fontFamily.medium,
+    color: 'rgba(255,255,255,0.9)',
+  },
+  heroWalletIcon: {},
+  heroAmountRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  heroValue: {
+    fontSize: 30,
+    fontFamily: typography.fontFamily.bold,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  heroSuffix: {
+    fontSize: typography.fontSizes.sm,
+    fontFamily: typography.fontFamily.regular,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  heroBadge: {
+    alignSelf: 'flex-start',
+    marginTop: spacing.smd,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 999,
+  },
+  heroBadgeText: {
+    fontSize: typography.fontSizes.xs,
+    fontFamily: typography.fontFamily.medium,
+    color: '#fff',
+  },
+
+  // KPI Grid
   kpiGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-    marginBottom: spacing.md,
+    gap: spacing.smd,
+    marginBottom: spacing.lg,
   },
   kpiCard: {
     flex: 1,
-    minWidth: '30%' as unknown as number,
-  },
-  kpiValue: {
-    fontSize: typography.fontSizes.xxl,
-    fontWeight: typography.fontWeights.bold as '700',
-    color: colors.primary,
-  },
-  kpiValueSmall: {
-    fontSize: typography.fontSizes.sm,
-    fontWeight: typography.fontWeights.bold as '700',
-    color: colors.primary,
+    padding: spacing.md,
+    borderRadius: 16,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
   },
   kpiLabel: {
-    fontSize: typography.fontSizes.sm,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
-  },
-  kpiDelta: {
     fontSize: typography.fontSizes.xs,
-    fontWeight: typography.fontWeights.semibold as '600',
-    marginTop: 2,
-  },
-  deltaPositive: {
-    color: colors.success,
-  },
-  deltaNegative: {
-    color: colors.error,
-  },
-  twoCol: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.md,
-  },
-  twoColCard: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: typography.fontSizes.sm,
-    color: colors.textSecondary,
+    fontFamily: typography.fontFamily.medium,
     marginBottom: spacing.xs,
   },
-  tresorerieValue: {
+  kpiValue: {
     fontSize: typography.fontSizes.xl,
-    fontWeight: typography.fontWeights.bold as '700',
-    color: colors.success,
+    fontFamily: typography.fontFamily.bold,
+    fontWeight: '700',
   },
-  miniChart: {
+  kpiAmountRow: { flexDirection: 'row', alignItems: 'baseline' },
+  kpiSuffix: {
+    fontSize: typography.fontSizes.xxs,
+    fontFamily: typography.fontFamily.regular,
+  },
+  kpiSub: {
+    fontSize: 10,
+    fontFamily: typography.fontFamily.regular,
+    marginTop: 2,
+  },
+  kpiEvolution: {
+    fontSize: 10,
+    fontFamily: typography.fontFamily.medium,
+    marginTop: 2,
+  },
+
+  // Sections
+  sectionBlock: { marginBottom: spacing.lg },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.smd,
+  },
+  sectionTitle: {
+    fontSize: typography.fontSizes.base,
+    fontFamily: typography.fontFamily.semibold,
+    fontWeight: '600',
+  },
+  sectionTitleLight: {
+    fontWeight: '400',
+    fontSize: typography.fontSizes.sm,
+  },
+  detailsLink: {
+    fontSize: typography.fontSizes.xs,
+    fontFamily: typography.fontFamily.medium,
+  },
+  seeAll: { fontSize: typography.fontSizes.xs },
+
+  // Chart
+  chartCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: spacing.md,
+    paddingBottom: spacing.lg,
+  },
+  chartBars: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    height: 60,
-    marginTop: spacing.sm,
+    height: 100,
+    gap: 6,
   },
-  barContainer: {
-    flex: 1,
-    alignItems: 'center',
+  barCol: { flex: 1, alignItems: 'center' },
+  barTrack: {
+    width: '100%',
+    height: 80,
+    justifyContent: 'flex-end',
   },
   bar: {
-    width: 16,
-    borderRadius: 4,
+    width: '100%',
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
     minHeight: 4,
   },
   barLabel: {
+    fontSize: 9,
+    fontFamily: typography.fontFamily.regular,
+    marginTop: 4,
+  },
+  barLabelBold: {
+    fontFamily: typography.fontFamily.bold,
+    fontWeight: '700',
+  },
+
+  // Watch cards
+  watchCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: spacing.md,
+    marginTop: spacing.smd,
+  },
+  watchTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.smd,
+  },
+  watchInfo: { flex: 1, marginRight: spacing.sm },
+  watchTitle: {
+    fontSize: typography.fontSizes.sm,
+    fontFamily: typography.fontFamily.bold,
+    fontWeight: '700',
+  },
+  watchCode: {
     fontSize: 10,
-    color: colors.textMuted,
+    fontFamily: typography.fontFamily.regular,
     marginTop: 2,
   },
-  sectionTitle: {
+  ratioBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 999,
+  },
+  ratioText: {
+    fontSize: 10,
+    fontFamily: typography.fontFamily.bold,
+    fontWeight: '700',
+  },
+  progressSection: { gap: 6 },
+  progressLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  progressLabel: {
+    fontSize: 10,
+    fontFamily: typography.fontFamily.medium,
+  },
+
+  // Deadlines
+  deadlineCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  deadlineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  calendarBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calMonth: {
+    fontSize: 10,
+    fontFamily: typography.fontFamily.bold,
+    fontWeight: '700',
+  },
+  calDay: {
     fontSize: typography.fontSizes.lg,
-    fontWeight: typography.fontWeights.semibold as '600',
-    color: colors.text,
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
+    fontFamily: typography.fontFamily.bold,
+    fontWeight: '700',
+    lineHeight: 20,
   },
-  attentionLibelle: {
-    fontSize: typography.fontSizes.base,
-    fontWeight: typography.fontWeights.medium as '500',
-    color: colors.text,
-  },
-  attentionCode: {
+  deadlineInfo: { flex: 1 },
+  deadlineTitle: {
     fontSize: typography.fontSizes.sm,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
+    fontFamily: typography.fontFamily.semibold,
+    fontWeight: '600',
   },
-  attentionRow: {
+  deadlineCode: {
+    fontSize: 10,
+    fontFamily: typography.fontFamily.regular,
+    marginTop: 2,
+  },
+
+  // Alerts section
+  alertsCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  alertRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: spacing.sm,
+    padding: spacing.md,
+    gap: spacing.smd,
   },
-  attentionTreso: {
-    fontSize: typography.fontSizes.sm,
-    color: colors.warning,
-    fontWeight: typography.fontWeights.medium as '500',
-  },
-  attentionRatio: {
-    fontSize: typography.fontSizes.sm,
-    fontWeight: typography.fontWeights.bold as '700',
-    color: colors.warning,
-  },
-  ratioCritical: {
-    color: colors.error,
-  },
-  deadlineLibelle: {
-    fontSize: typography.fontSizes.base,
-    fontWeight: typography.fontWeights.medium as '500',
-    color: colors.text,
-  },
-  deadlineDate: {
-    fontSize: typography.fontSizes.sm,
-    color: colors.warning,
-    marginTop: spacing.xs,
-  },
-  marchesLink: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  alertIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
+    justifyContent: 'center',
   },
-  voirTout: {
+  alertIconText: { fontSize: 16 },
+  alertInfo: { flex: 1 },
+  alertTitle: {
     fontSize: typography.fontSizes.sm,
-    color: colors.primary,
-    fontWeight: typography.fontWeights.medium as '500',
+    fontFamily: typography.fontFamily.medium,
   },
+  alertTime: {
+    fontSize: 10,
+    fontFamily: typography.fontFamily.regular,
+    marginTop: 2,
+  },
+
+  // Empty state
+  emptyCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: spacing.xl,
+    alignItems: 'center',
+  },
+  emptyIcon: { fontSize: 32, marginBottom: spacing.sm },
+  emptyIconWrap: { marginBottom: spacing.sm },
   emptyText: {
-    color: colors.textMuted,
-    textAlign: 'center',
-  },
-  marcheLibelle: {
-    fontSize: typography.fontSizes.base,
-    fontWeight: typography.fontWeights.medium as '500',
-    color: colors.text,
-  },
-  marcheCode: {
     fontSize: typography.fontSizes.sm,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
+    fontFamily: typography.fontFamily.medium,
+    marginBottom: spacing.xs,
   },
-  marcheMontant: {
-    fontSize: typography.fontSizes.base,
-    fontWeight: typography.fontWeights.semibold as '600',
-    color: colors.primary,
-    marginTop: spacing.sm,
+  emptySubtext: {
+    fontSize: typography.fontSizes.xs,
+    fontFamily: typography.fontFamily.regular,
+    textAlign: 'center',
   },
 });

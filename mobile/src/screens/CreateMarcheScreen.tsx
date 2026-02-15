@@ -7,22 +7,27 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  TouchableOpacity,
+  Switch,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { Briefcase } from 'lucide-react-native';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { DatePickerInput } from '../components/DatePickerInput';
+import { SectionHeader } from '../components/SectionHeader';
 import { colors, typography, spacing } from '../theme';
 import { createMarche } from '../api/marches';
 
 export function CreateMarcheScreen() {
-  const navigation = useNavigation<{ navigate: (s: string, p?: { id: string }) => void; goBack: () => void }>();
+  const navigation = useNavigation<any>();
   const [libelle, setLibelle] = useState('');
   const [montant, setMontant] = useState('');
   const [deviseCode, setDeviseCode] = useState('XOF');
   const [dateDebut, setDateDebut] = useState(new Date().toISOString().slice(0, 10));
   const [dateFin, setDateFin] = useState('');
+  const [prefinancement, setPrefinancement] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const handleCreate = async () => {
@@ -67,8 +72,17 @@ export function CreateMarcheScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.content}
       >
-        <Text style={styles.title}>Nouveau marché</Text>
+        {/* Banner */}
+        <View style={styles.banner}>
+          <Briefcase size={24} color={colors.primary} />
+          <View>
+            <Text style={styles.bannerTitle}>Emeraude Business</Text>
+            <Text style={styles.bannerSubtitle}>Nouveau marché</Text>
+          </View>
+        </View>
 
+        {/* Identification */}
+        <SectionHeader title="Identification" />
         <Card>
           <Input
             label="Libellé *"
@@ -83,20 +97,43 @@ export function CreateMarcheScreen() {
             placeholder="0"
             keyboardType="decimal-pad"
           />
+        </Card>
 
-          <Text style={styles.fieldLabel}>Devise</Text>
-          <View style={styles.deviseRow}>
+        {/* Économie */}
+        <SectionHeader title="Économie" />
+        <Card>
+          <Text style={styles.fieldLabel}>DEVISE</Text>
+          <View style={styles.segmented}>
             {devises.map((d) => (
-              <Button
+              <TouchableOpacity
                 key={d}
-                title={d}
-                variant={deviseCode === d ? 'primary' : 'outline'}
                 onPress={() => setDeviseCode(d)}
-                style={styles.deviseBtn}
-              />
+                style={[styles.segmentBtn, deviseCode === d && styles.segmentActive]}
+              >
+                <Text style={[styles.segmentText, deviseCode === d && styles.segmentTextActive]}>
+                  {d}
+                </Text>
+              </TouchableOpacity>
             ))}
           </View>
 
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleInfo}>
+              <Text style={styles.toggleLabel}>Pré-financement</Text>
+              <Text style={styles.toggleDesc}>Activer le préfinancement pour ce marché</Text>
+            </View>
+            <Switch
+              value={prefinancement}
+              onValueChange={setPrefinancement}
+              trackColor={{ false: colors.border, true: colors.primaryLight }}
+              thumbColor={prefinancement ? colors.primary : '#f4f3f4'}
+            />
+          </View>
+        </Card>
+
+        {/* Calendrier */}
+        <SectionHeader title="Calendrier" />
+        <Card>
           <DatePickerInput
             label="Date de début"
             value={dateDebut}
@@ -107,14 +144,16 @@ export function CreateMarcheScreen() {
             value={dateFin}
             onChange={setDateFin}
           />
-
-          <Button
-            title="Créer le marché"
-            onPress={handleCreate}
-            loading={submitting}
-            disabled={submitting}
-          />
         </Card>
+
+        <Button
+          title="Créer le marché"
+          onPress={handleCreate}
+          loading={submitting}
+          disabled={submitting}
+          size="lg"
+          style={styles.createBtn}
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -124,24 +163,86 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scroll: { flex: 1 },
   content: { padding: spacing.md, paddingBottom: spacing.xxl },
-  title: {
-    fontSize: typography.fontSizes.xxl,
-    fontWeight: typography.fontWeights.bold as '700',
-    color: colors.text,
-    marginBottom: spacing.lg,
-  },
-  fieldLabel: {
-    fontSize: typography.fontSizes.sm,
-    fontWeight: typography.fontWeights.medium as '500',
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-  },
-  deviseRow: {
+
+  // Banner
+  banner: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    alignItems: 'center',
+    backgroundColor: colors.primaryTint,
+    borderRadius: 20,
+    padding: spacing.md,
+    gap: spacing.smd,
+    marginBottom: spacing.sm,
+  },
+  bannerIcon: { fontSize: 28 },
+  bannerTitle: {
+    fontSize: typography.fontSizes.base,
+    fontFamily: typography.fontFamily.bold,
+    fontWeight: typography.fontWeights.bold as '700',
+    color: colors.primary,
+  },
+  bannerSubtitle: {
+    fontSize: typography.fontSizes.sm,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textSecondary,
+  },
+
+  fieldLabel: {
+    fontSize: typography.fontSizes.xxs,
+    fontFamily: typography.fontFamily.semibold,
+    fontWeight: typography.fontWeights.semibold as '600',
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
+    letterSpacing: 1.2,
+  },
+
+  // Segmented
+  segmented: {
+    flexDirection: 'row',
+    backgroundColor: colors.borderLight,
+    borderRadius: 12,
+    padding: spacing.xs,
     marginBottom: spacing.md,
   },
-  deviseBtn: {
+  segmentBtn: {
     flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.smd,
+    borderRadius: 8,
+  },
+  segmentActive: {
+    backgroundColor: colors.primary,
+  },
+  segmentText: {
+    fontSize: typography.fontSizes.sm,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.textSecondary,
+  },
+  segmentTextActive: {
+    color: '#fff',
+    fontFamily: typography.fontFamily.semibold,
+  },
+
+  // Toggle
+  toggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  toggleInfo: { flex: 1, marginRight: spacing.md },
+  toggleLabel: {
+    fontSize: typography.fontSizes.sm,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.text,
+  },
+  toggleDesc: {
+    fontSize: typography.fontSizes.xs,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textMuted,
+    marginTop: spacing.xxs,
+  },
+
+  createBtn: {
+    marginTop: spacing.lg,
   },
 });

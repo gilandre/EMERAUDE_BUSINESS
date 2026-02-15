@@ -1,84 +1,99 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import {
+  useFonts,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from '@expo-google-fonts/inter';
+import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { LoginScreen } from './src/screens/LoginScreen';
-import { DashboardScreen } from './src/screens/DashboardScreen';
-import { MarchesScreen } from './src/screens/MarchesScreen';
-import { MarcheDetailScreen } from './src/screens/MarcheDetailScreen';
-import { CreateMarcheScreen } from './src/screens/CreateMarcheScreen';
+import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
+import { BottomTabNavigator } from './src/navigation/BottomTabNavigator';
+
+SplashScreen.preventAutoHideAsync();
 
 const Stack = createNativeStackNavigator();
 
-function HeaderLogoutButton() {
-  const { logout } = useAuth();
-  return (
-    <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
-      <Text style={styles.logoutText}>Déconnexion</Text>
-    </TouchableOpacity>
-  );
-}
-
 function AppNavigator() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { colors, isDark } = useTheme();
 
   if (isLoading) {
-    return null;
+    return (
+      <View style={[styles.loading, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
   }
 
   if (!isAuthenticated) {
     return (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       </Stack.Navigator>
     );
   }
 
+  return <BottomTabNavigator />;
+}
+
+function AppContent() {
+  const { isDark } = useTheme();
+
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: { backgroundColor: '#0066cc' },
-        headerTintColor: '#fff',
-        headerTitleStyle: { fontWeight: '600', fontSize: 18 },
-      }}
-    >
-      <Stack.Screen
-        name="Dashboard"
-        component={DashboardScreen}
-        options={{ title: 'Emeraude Business', headerRight: () => <HeaderLogoutButton /> }}
-      />
-      <Stack.Screen name="Marches" component={MarchesScreen} options={{ title: 'Marchés' }} />
-      <Stack.Screen
-        name="MarcheDetail"
-        component={MarcheDetailScreen}
-        options={({ route }) => ({ title: route.params?.id ? 'Détail marché' : 'Marché' })}
-      />
-      <Stack.Screen
-        name="CreateMarche"
-        component={CreateMarcheScreen}
-        options={{ title: 'Nouveau marché' }}
-      />
-    </Stack.Navigator>
+    <>
+      <NavigationContainer>
+        <AppNavigator />
+      </NavigationContainer>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  logoutBtn: { paddingHorizontal: 12, paddingVertical: 8 },
-  logoutText: { color: '#fff', fontSize: 14 },
+  loading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
+
+  const onLayoutRootView = useCallback(async () => {
+    if (fontsLoaded) {
+      await SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) {
+    return null;
+  }
+
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <NavigationContainer>
-          <AppNavigator />
-        </NavigationContainer>
-        <StatusBar style="auto" />
-      </AuthProvider>
+      <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+        <ThemeProvider>
+          <AuthProvider>
+            <AppContent />
+          </AuthProvider>
+        </ThemeProvider>
+      </View>
     </SafeAreaProvider>
   );
 }

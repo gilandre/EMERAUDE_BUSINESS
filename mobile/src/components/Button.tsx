@@ -63,6 +63,7 @@ export function Button({
           borderColor: colors.primary,
           opacity: disabled ? 0.6 : 1,
         },
+        variant === 'primary' && styles.primaryShadow,
         style,
       ]}
     >
@@ -95,9 +96,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 24,
+  },
+  primaryShadow: {
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   text: {
-    fontWeight: typography.fontWeights.semibold,
+    fontFamily: typography.fontFamily.bold,
+    fontWeight: typography.fontWeights.bold,
   },
 });

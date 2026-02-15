@@ -11,12 +11,12 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0066cc"
+      "backgroundColor": "#10b77f"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0066cc"
+        "backgroundColor": "#10b77f"
       },
       "package": "com.emeraude.business"
     },

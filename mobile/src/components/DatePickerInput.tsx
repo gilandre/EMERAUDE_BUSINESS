@@ -26,7 +26,7 @@ export function DatePickerInput({ label, value, onChange }: DatePickerInputProps
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label}>{label.toUpperCase()}</Text>
       <TouchableOpacity onPress={() => setShow(true)} style={styles.button}>
         <Text style={[styles.value, !value && styles.placeholder]}>
           {displayValue}
@@ -49,21 +49,22 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   label: {
-    fontSize: typography.fontSizes.sm,
-    fontWeight: typography.fontWeights.medium as '500',
-    color: colors.textSecondary,
+    fontSize: typography.fontSizes.xxs,
+    fontFamily: typography.fontFamily.semibold,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.textMuted,
     marginBottom: spacing.xs,
+    letterSpacing: 1.2,
   },
   button: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
+    backgroundColor: colors.borderLight,
+    borderRadius: 16,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
   },
   value: {
     fontSize: typography.fontSizes.base,
+    fontFamily: typography.fontFamily.regular,
     color: colors.text,
   },
   placeholder: {

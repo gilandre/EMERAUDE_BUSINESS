@@ -46,6 +46,11 @@ model User {
   userMenus     UserMenu[]
   notificationPrefs UserNotificationPreferences?
   pushSubscriptions PushSubscription[]
+  justificatifs    Justificatif[]      @relation("UserJustificatifs")
+  fraisDeplacement FraisDeplacement[]  @relation("UserFrais")
+  declarations     DeclarationUsage[]  @relation("UserDeclarations")
+  discussions      Discussion[]        @relation("UserDiscussions")
+  messages         Message[]           @relation("UserMessages")
 }
 
 model UserNotificationPreferences {
@@ -337,9 +342,11 @@ model Marche {
   // TAUX DE CHANGE À LA CRÉATION
   tauxChangeCreation    Decimal  @db.Decimal(15, 6) @map("taux_change_creation")
 
-  accomptes       Accompte[]
-  decaissements   Decaissement[]
-  prefinancement  Prefinancement?
+  accomptes        Accompte[]
+  decaissements    Decaissement[]
+  prefinancement   Prefinancement?
+  fraisDeplacement FraisDeplacement[]
+  declarations     DeclarationUsage[]
 
   @@index([statut])
   @@index([updatedAt(sort: Desc)])
@@ -392,6 +399,10 @@ model Decaissement {
   modePaiement      String?  @map("mode_paiement")   // especes, virement, cheque, mobile_money
   source            SourceDecaissement @default(TRESORERIE)
 
+  // Lien vers le bénéficiaire référencé
+  beneficiaireId    String?  @map("beneficiaire_id")
+  beneficiaireRef   Beneficiaire? @relation(fields: [beneficiaireId], references: [id])
+
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
@@ -402,6 +413,7 @@ model Decaissement {
   @@index([statut])
   @@index([source])
   @@index([beneficiaire])
+  @@index([beneficiaireId])
 }
 
 model Prefinancement {
@@ -674,4 +686,139 @@ model Metric {
   value     Decimal  @db.Decimal(20, 4)
   labels    Json?
   timestamp DateTime @default(now())
+}
+
+// =============================================================================
+// BÉNÉFICIAIRES
+// =============================================================================
+
+model Beneficiaire {
+  id             String   @id @default(cuid())
+  code           String   @unique
+  nom            String
+  type           String   @default("entreprise")
+  contact        String?
+  email          String?
+  adresse        String?
+  modePaiement   String?
+  banque         String?
+  compteBancaire String?
+  actif          Boolean  @default(true)
+  totalPaye      Decimal  @default(0) @db.Decimal(15, 2)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  decaissements  Decaissement[]
+
+  @@index([actif])
+  @@index([nom])
+}
+
+// =============================================================================
+// JUSTIFICATIFS
+// =============================================================================
+
+model Justificatif {
+  id           String   @id @default(cuid())
+  entityType   String
+  entityId     String
+  fileName     String
+  fileSize     Int
+  mimeType     String
+  filePath     String
+  description  String?
+  uploadedById String
+  uploadedBy   User     @relation("UserJustificatifs", fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([entityType, entityId])
+}
+
+// =============================================================================
+// FRAIS DE DÉPLACEMENT
+// =============================================================================
+
+model FraisDeplacement {
+  id          String   @id @default(cuid())
+  marcheId    String
+  marche      Marche   @relation(fields: [marcheId], references: [id])
+  libelle     String
+  montant     Decimal  @db.Decimal(15, 2)
+  devise      String   @default("XOF")
+  categorie   String
+  date        DateTime
+  statut      String   @default("EN_ATTENTE")
+  description String?
+  createdById String
+  createdBy   User     @relation("UserFrais", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([marcheId])
+  @@index([statut])
+}
+
+// =============================================================================
+// DÉCLARATION USAGE DES FONDS
+// =============================================================================
+
+model DeclarationUsage {
+  id            String   @id @default(cuid())
+  marcheId      String
+  marche        Marche   @relation(fields: [marcheId], references: [id])
+  reference     String   @unique
+  montantRecu   Decimal  @db.Decimal(15, 2)
+  dateReception DateTime
+  statut        String   @default("BROUILLON")
+  totalJustifie Decimal  @default(0) @db.Decimal(15, 2)
+  motifRejet    String?
+  soumisAt      DateTime?
+  approuveAt    DateTime?
+  approuveParId String?
+  createdById   String
+  createdBy     User     @relation("UserDeclarations", fields: [createdById], references: [id])
+  lignes        DeclarationLigne[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([marcheId])
+  @@index([statut])
+}
+
+model DeclarationLigne {
+  id            String           @id @default(cuid())
+  declarationId String
+  declaration   DeclarationUsage @relation(fields: [declarationId], references: [id], onDelete: Cascade)
+  libelle       String
+  montant       Decimal          @db.Decimal(15, 2)
+  createdAt     DateTime         @default(now())
+}
+
+// =============================================================================
+// DISCUSSIONS & MESSAGES
+// =============================================================================
+
+model Discussion {
+  id          String    @id @default(cuid())
+  entityType  String
+  entityId    String
+  sujet       String?
+  statut      String    @default("OUVERTE")
+  createdById String
+  createdBy   User      @relation("UserDiscussions", fields: [createdById], references: [id])
+  messages    Message[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([entityType, entityId])
+}
+
+model Message {
+  id           String     @id @default(cuid())
+  discussionId String
+  discussion   Discussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  contenu      String
+  type         String     @default("MESSAGE")
+  auteurId     String
+  auteur       User       @relation("UserMessages", fields: [auteurId], references: [id])
+  createdAt    DateTime   @default(now())
 }

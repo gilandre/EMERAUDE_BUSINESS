@@ -29,6 +29,7 @@ import { colors, typography, spacing } from '../theme';
 import { apiFetch } from '../api/client';
 import { useDebounce } from '../hooks/useDebounce';
 import { formatMontant } from '../utils/format';
+import { ErrorState } from '../components/ErrorState';
 
 interface MarcheItem {
   id: string;
@@ -60,9 +61,11 @@ export function MarchesScreen() {
   const [filterStatut, setFilterStatut] = useState<string | null>(null);
   const [filterSort, setFilterSort] = useState<'updatedAt' | 'montant'>('updatedAt');
   const debouncedSearch = useDebounce(search, 400);
+  const [error, setError] = useState(false);
 
   const load = useCallback(async (pageNum = 1) => {
     try {
+      setError(false);
       const params = new URLSearchParams();
       params.set('page', String(pageNum));
       params.set('pageSize', '20');
@@ -74,6 +77,7 @@ export function MarchesScreen() {
       const res = await apiFetch<MarchesResponse>(`/api/marches?${params}`);
       setData(res);
     } catch (e) {
+      setError(true);
       setData(null);
     } finally {
       setLoading(false);
@@ -116,6 +120,8 @@ export function MarchesScreen() {
       </View>
     );
   }
+
+  if (error) return <ErrorState onRetry={() => load(1)} />;
 
   const items = data?.data ?? [];
   const totalValue = items.reduce((sum, m) => sum + (m.montantXOF ?? m.montant), 0);

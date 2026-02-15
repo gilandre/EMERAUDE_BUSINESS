@@ -11,7 +11,7 @@ import {
   Modal,
   FlatList,
 } from 'react-native';
-import { CheckCircle, Calendar, ChevronDown } from 'lucide-react-native';
+import { CheckCircle, Calendar, ChevronDown, ArrowDownLeft } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { typography, spacing } from '../theme';
@@ -19,7 +19,9 @@ import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { DatePickerInput } from '../components/DatePickerInput';
 import { SectionHeader } from '../components/SectionHeader';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { apiFetch } from '../api/client';
+import { formatMontant } from '../utils/format';
 
 const DEVISES = ['XOF', 'EUR', 'USD'];
 
@@ -48,6 +50,7 @@ export function NouvelEncaissementScreen() {
   const [modeReglement, setModeReglement] = useState('especes');
   const [submitting, setSubmitting] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const fetchMarches = useCallback(async () => {
     try {
@@ -65,7 +68,7 @@ export function NouvelEncaissementScreen() {
 
   useEffect(() => { fetchMarches(); }, [fetchMarches]);
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!montant.trim()) {
       Alert.alert('Erreur', 'Le montant est requis');
       return;
@@ -74,11 +77,14 @@ export function NouvelEncaissementScreen() {
       Alert.alert('Erreur', 'Veuillez sélectionner un marché');
       return;
     }
+    setShowConfirm(true);
+  };
 
+  const doSubmit = async () => {
     setSubmitting(true);
     try {
       const payload = {
-        marcheId: selectedMarche.id,
+        marcheId: selectedMarche!.id,
         montant: parseFloat(montant.replace(/\s/g, '').replace(',', '.')),
         deviseCode: devise,
         dateReception,
@@ -90,15 +96,27 @@ export function NouvelEncaissementScreen() {
         body: JSON.stringify(payload),
       });
 
+      setShowConfirm(false);
       Alert.alert('Succès', 'Encaissement confirmé avec succès', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (err: any) {
+      setShowConfirm(false);
       Alert.alert('Erreur', err.message || 'Impossible d\'enregistrer l\'encaissement');
     } finally {
       setSubmitting(false);
     }
   };
+
+  const parsedMontant = parseFloat(montant.replace(/\s/g, '').replace(',', '.')) || 0;
+  const deviseLabel = devise === 'XOF' ? 'FCFA' : devise;
+  const confirmLines = [
+    { label: 'Marché', value: selectedMarche ? `${selectedMarche.code} - ${selectedMarche.libelle}` : '—' },
+    { label: 'Montant', value: formatMontant(parsedMontant, devise) },
+    { label: 'Devise', value: deviseLabel },
+    { label: 'Date', value: dateReception },
+    { label: 'Mode', value: MODE_REGLEMENT_OPTIONS.find(o => o.key === modeReglement)?.label ?? modeReglement },
+  ];
 
   return (
     <KeyboardAvoidingView
@@ -232,6 +250,18 @@ export function NouvelEncaissementScreen() {
 
         <View style={{ height: spacing.xxl }} />
       </ScrollView>
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        visible={showConfirm}
+        title="Confirmer l'encaissement"
+        lines={confirmLines}
+        confirmLabel="Valider"
+        loading={submitting}
+        onConfirm={doSubmit}
+        onCancel={() => setShowConfirm(false)}
+        icon={<ArrowDownLeft size={22} color={colors.primary} />}
+      />
 
       {/* Marché Picker Modal */}
       <Modal visible={showMarchePicker} transparent animationType="slide">

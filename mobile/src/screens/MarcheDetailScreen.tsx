@@ -48,6 +48,7 @@ import {
   type Decaissement,
 } from '../api/marches';
 import { formatMontant as fmtUtil, formatTimeAgo as fmtTimeAgoUtil } from '../utils/format';
+import { ErrorState } from '../components/ErrorState';
 
 type NavParams = { MarcheDetail: { id: string } };
 type Section = 'apercu' | 'encaissements' | 'decaissements';
@@ -97,12 +98,15 @@ export function MarcheDetailScreen() {
   // Prefinancement form
   const [prefMontant, setPrefMontant] = useState('');
   const [prefSubmitting, setPrefSubmitting] = useState(false);
+  const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
     try {
+      setError(false);
       const res = await getMarche(id);
       setData(res);
     } catch {
+      setError(true);
       setData(null);
     } finally {
       setLoading(false);
@@ -244,6 +248,8 @@ export function MarcheDetailScreen() {
     );
   }
 
+  if (error) return <ErrorState onRetry={load} />;
+
   if (!data) {
     return (
       <View style={styles.centered}>
@@ -252,9 +258,13 @@ export function MarcheDetailScreen() {
     );
   }
 
-  const syn = data.synthese ?? {};
-  const soldeDisponible = (syn.solde ?? 0) + (syn.prefinancementMax ?? 0) - (syn.prefinancementUtilise ?? 0);
-  const encaissementProgress = (syn.totalEncaissements ?? 0) / (data.montantTotalXOF ?? data.montantTotal ?? 1);
+  const syn = data.synthese ?? {
+    totalEncaissements: 0, totalDecaissements: 0,
+    totalEncaissementsXOF: 0, totalDecaissementsXOF: 0,
+    solde: 0, soldeXOF: 0, prefinancementMax: 0, prefinancementUtilise: 0,
+  };
+  const soldeDisponible = (syn?.solde ?? 0) + (syn?.prefinancementMax ?? 0) - (syn?.prefinancementUtilise ?? 0);
+  const encaissementProgress = (syn?.totalEncaissements ?? 0) / (data.montantTotalXOF ?? data.montantTotal ?? 1);
 
   const sections: { key: Section; label: string }[] = [
     { key: 'apercu', label: 'Aperçu' },

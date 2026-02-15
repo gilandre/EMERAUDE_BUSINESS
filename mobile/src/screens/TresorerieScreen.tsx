@@ -11,6 +11,7 @@ import { useTheme } from '../context/ThemeContext';
 import { typography, spacing } from '../theme';
 import { apiFetch } from '../api/client';
 import { formatMontant } from '../utils/format';
+import { ErrorState } from '../components/ErrorState';
 
 interface TresorerieData {
   soldeGlobal: number;
@@ -33,21 +34,15 @@ export function TresorerieScreen({ navigation }: any) {
   const [data, setData] = useState<TresorerieData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
+      setError(false);
       const res = await apiFetch<TresorerieData>('/api/tresorerie/summary');
       setData(res);
     } catch {
-      // Fallback
-      setData({
-        soldeGlobal: 0,
-        totalEncaissementsMois: 0,
-        totalDecaissementsMois: 0,
-        decaissementsAJustifier: 0,
-        totalBeneficiaires: 0,
-        derniersMouvements: [],
-      });
+      setError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -67,6 +62,8 @@ export function TresorerieScreen({ navigation }: any) {
       </View>
     );
   }
+
+  if (error) return <ErrorState onRetry={fetchData} />;
 
   return (
     <ScrollView

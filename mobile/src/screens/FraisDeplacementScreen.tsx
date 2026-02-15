@@ -15,6 +15,7 @@ import { useTheme } from '../context/ThemeContext';
 import { typography, spacing } from '../theme';
 import { Badge } from '../components/Badge';
 import { apiFetch } from '../api/client';
+import { ErrorState } from '../components/ErrorState';
 
 interface FraisDeplacement {
   id: string;
@@ -39,9 +40,11 @@ export function FraisDeplacementScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedContrat, setSelectedContrat] = useState('Tous');
   const [selectedFrais, setSelectedFrais] = useState<FraisDeplacement | null>(null);
+  const [error, setError] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
+      setError(false);
       const params = new URLSearchParams();
       params.set('page', '1');
       params.set('limit', '50');
@@ -77,6 +80,7 @@ export function FraisDeplacementScreen() {
         })));
       }
     } catch {
+      setError(true);
       setItems([]);
     } finally {
       setLoading(false);
@@ -122,6 +126,8 @@ export function FraisDeplacementScreen() {
       </View>
     );
   }
+
+  if (error) return <ErrorState onRetry={fetchData} />;
 
   return (
     <ScrollView

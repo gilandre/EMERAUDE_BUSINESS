@@ -41,8 +41,8 @@ export function ProfilScreen() {
   const displayName = user?.name || [user?.prenom, user?.nom].filter(Boolean).join(' ') || 'Utilisateur';
 
   const accountItems: MenuItem[] = [
-    { icon: <UserCircle size={20} color={colors.primary} />, label: 'Informations personnelles', onPress: () => Alert.alert('Informations personnelles', 'Cette fonctionnalité sera disponible prochainement.') },
-    { icon: <Shield size={20} color={colors.primary} />, label: 'Sécurité & mot de passe', onPress: () => Alert.alert('Sécurité', 'Cette fonctionnalité sera disponible prochainement.') },
+    { icon: <UserCircle size={20} color={colors.primary} />, label: 'Informations personnelles', onPress: () => navigation.navigate('InfoPersonnelles') },
+    { icon: <Shield size={20} color={colors.primary} />, label: 'Sécurité & mot de passe', onPress: () => navigation.navigate('Securite') },
     { icon: <Mail size={20} color={colors.primary} />, label: 'Notifications email', onPress: () => navigation.navigate('ParametresNotifications') },
   ];
 

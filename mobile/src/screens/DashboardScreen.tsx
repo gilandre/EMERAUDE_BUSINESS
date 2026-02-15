@@ -27,6 +27,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api/client';
 import { formatMontantSplit, formatShort, formatTimeAgo } from '../utils/format';
+import { ErrorState } from '../components/ErrorState';
 
 interface DashboardData {
   kpis?: {
@@ -78,12 +79,15 @@ export function DashboardScreen() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
     try {
+      setError(false);
       const res = await apiFetch<DashboardData>('/api/dashboard/kpis');
       setData(res);
     } catch {
+      setError(true);
       setData(null);
     } finally {
       setLoading(false);
@@ -144,6 +148,8 @@ export function DashboardScreen() {
       </ScrollView>
     );
   }
+
+  if (error) return <ErrorState onRetry={load} />;
 
   const kpis = data?.kpis ?? {};
   const marchesAttention = data?.marchesAttention ?? [];

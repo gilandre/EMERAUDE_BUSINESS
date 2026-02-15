@@ -1,0 +1,19 @@
+# Node modules (reinstalled by EAS)
+node_modules/
+
+# Expo cache
+.expo/
+
+# Credentials (keystore embedded during build config)
+android-keystore.jks
+credentials.json
+
+# IDE
+.idea/
+.vscode/
+
+# macOS
+.DS_Store
+
+# Git
+.git/

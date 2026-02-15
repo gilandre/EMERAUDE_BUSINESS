@@ -17,6 +17,7 @@ import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
 import { SectionHeader } from '../components/SectionHeader';
 import { apiFetch, API_BASE, getToken } from '../api/client';
+import { ErrorState } from '../components/ErrorState';
 
 type NavParams = { DecaissementDetail: { id: string } };
 
@@ -49,9 +50,11 @@ export function DecaissementDetailScreen() {
   const [justificatifs, setJustificatifs] = useState<Justificatif[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
+      setError(false);
       const [decRes, justifRes] = await Promise.all([
         apiFetch<any>(`/api/decaissements/${id}`),
         apiFetch<any>(`/api/justificatifs?entityType=Decaissement&entityId=${id}`).catch(() => ({ justificatifs: [] })),
@@ -78,6 +81,7 @@ export function DecaissementDetailScreen() {
         date: j.createdAt || j.date || '',
       })));
     } catch {
+      setError(true);
       setDecaissement(null);
       setJustificatifs([]);
     } finally {
@@ -164,6 +168,8 @@ export function DecaissementDetailScreen() {
       </View>
     );
   }
+
+  if (error) return <ErrorState onRetry={fetchData} />;
 
   const statut = decaissement?.statut || 'Inconnu';
   const montant = decaissement?.montant || 0;

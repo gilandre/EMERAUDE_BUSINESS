@@ -26,6 +26,8 @@ import { DeclarationUsageScreen } from '../screens/DeclarationUsageScreen';
 import { DiscussionMarcheScreen } from '../screens/DiscussionMarcheScreen';
 import { ConfigurationRappelsScreen } from '../screens/ConfigurationRappelsScreen';
 import { ParametresNotificationsScreen } from '../screens/ParametresNotificationsScreen';
+import { InfoPersonnellesScreen } from '../screens/InfoPersonnellesScreen';
+import { SecuriteScreen } from '../screens/SecuriteScreen';
 
 import { typography } from '../theme';
 import { useTheme } from '../context/ThemeContext';
@@ -191,6 +193,16 @@ function ProfilStackScreen() {
         name="ParametresNotifications"
         component={ParametresNotificationsScreen}
         options={{ title: 'Notifications' }}
+      />
+      <ProfilStack.Screen
+        name="InfoPersonnelles"
+        component={InfoPersonnellesScreen}
+        options={{ title: 'Informations personnelles' }}
+      />
+      <ProfilStack.Screen
+        name="Securite"
+        component={SecuriteScreen}
+        options={{ title: 'Sécurité' }}
       />
     </ProfilStack.Navigator>
   );

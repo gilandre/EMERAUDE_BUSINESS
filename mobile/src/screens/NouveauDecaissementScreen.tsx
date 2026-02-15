@@ -18,7 +18,9 @@ import { typography, spacing } from '../theme';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { SectionHeader } from '../components/SectionHeader';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { apiFetch } from '../api/client';
+import { formatMontant } from '../utils/format';
 
 const SOURCE_OPTIONS = [
   { key: 'TRESORERIE', label: 'Trésorerie', icon: Wallet },
@@ -42,6 +44,7 @@ export function NouveauDecaissementScreen() {
   const [beneficiaire, setBeneficiaire] = useState('');
   const [source, setSource] = useState<'TRESORERIE' | 'PREFINANCEMENT'>('TRESORERIE');
   const [submitting, setSubmitting] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const fetchMarches = useCallback(async () => {
     try {
@@ -59,7 +62,7 @@ export function NouveauDecaissementScreen() {
 
   useEffect(() => { fetchMarches(); }, [fetchMarches]);
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!montant.trim()) {
       Alert.alert('Erreur', 'Le montant est requis');
       return;
@@ -68,7 +71,10 @@ export function NouveauDecaissementScreen() {
       Alert.alert('Erreur', 'Le bénéficiaire est requis');
       return;
     }
+    setShowConfirm(true);
+  };
 
+  const doSubmit = async () => {
     setSubmitting(true);
     try {
       const payload: Record<string, any> = {
@@ -85,15 +91,25 @@ export function NouveauDecaissementScreen() {
         body: JSON.stringify(payload),
       });
 
+      setShowConfirm(false);
       Alert.alert('Succès', 'Décaissement enregistré avec succès', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (err: any) {
+      setShowConfirm(false);
       Alert.alert('Erreur', err.message || 'Impossible d\'enregistrer le décaissement');
     } finally {
       setSubmitting(false);
     }
   };
+
+  const parsedMontant = parseFloat(montant.replace(/\s/g, '').replace(',', '.')) || 0;
+  const confirmLines = [
+    { label: 'Marché', value: selectedMarche ? `${selectedMarche.code} - ${selectedMarche.libelle}` : 'Non spécifié' },
+    { label: 'Montant', value: formatMontant(parsedMontant, 'XOF') },
+    { label: 'Bénéficiaire', value: beneficiaire.trim() || '—' },
+    { label: 'Source', value: source === 'TRESORERIE' ? 'Trésorerie' : 'Préfinancement' },
+  ];
 
   return (
     <KeyboardAvoidingView
@@ -194,6 +210,18 @@ export function NouveauDecaissementScreen() {
 
         <View style={{ height: spacing.xxl }} />
       </ScrollView>
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        visible={showConfirm}
+        title="Confirmer le décaissement"
+        lines={confirmLines}
+        confirmLabel="Valider"
+        loading={submitting}
+        onConfirm={doSubmit}
+        onCancel={() => setShowConfirm(false)}
+        icon={<Wallet size={22} color={colors.primary} />}
+      />
 
       {/* Marché Picker Modal */}
       <Modal visible={showMarchePicker} transparent animationType="slide">

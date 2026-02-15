@@ -11,6 +11,7 @@ import { Badge } from '../components/Badge';
 import { Skeleton, SkeletonCard } from '../components/Skeleton';
 import { useDebounce } from '../hooks/useDebounce';
 import { formatMontant, formatShort } from '../utils/format';
+import { ErrorState } from '../components/ErrorState';
 
 interface BeneficiaireItem {
   id: string;
@@ -32,9 +33,11 @@ export function BeneficiairesScreen({ navigation }: any) {
   const [showFilters, setShowFilters] = useState(false);
   const [filterType, setFilterType] = useState<string | null>(null);
   const debouncedSearch = useDebounce(search, 400);
+  const [error, setError] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
+      setError(false);
       const params = new URLSearchParams();
       if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
       if (filterType) params.set('type', filterType);
@@ -43,6 +46,7 @@ export function BeneficiairesScreen({ navigation }: any) {
       const res = await apiFetch<any>(`/api/beneficiaires?${params}`);
       setItems(res.beneficiaires || res.data || []);
     } catch {
+      setError(true);
       setItems([]);
     } finally {
       setLoading(false);
@@ -104,6 +108,8 @@ export function BeneficiairesScreen({ navigation }: any) {
       </View>
     );
   }
+
+  if (error) return <ErrorState onRetry={fetchData} />;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

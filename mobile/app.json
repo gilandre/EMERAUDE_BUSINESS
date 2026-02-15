@@ -25,9 +25,12 @@
     },
     "extra": {
       "eas": {
-        "projectId": "emeraude-business"
+        "projectId": "4d2c3e3c-1ad5-4c00-bc50-00daba73ed86"
       }
     },
-    "plugins": ["expo-secure-store"]
+    "plugins": [
+      "expo-secure-store"
+    ],
+    "owner": "gaegnakou"
   }
 }

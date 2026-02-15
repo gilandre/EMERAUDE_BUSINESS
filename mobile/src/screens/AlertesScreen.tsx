@@ -20,6 +20,7 @@ import { Badge } from '../components/Badge';
 import { typography, spacing } from '../theme';
 import { useTheme } from '../context/ThemeContext';
 import { apiFetch } from '../api/client';
+import { ErrorState } from '../components/ErrorState';
 
 interface Notification {
   id: string;
@@ -63,13 +64,16 @@ export function AlertesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState<'all' | 'critiques'>('all');
+  const [error, setError] = useState(false);
 
   const load = async () => {
     try {
+      setError(false);
       const res = await apiFetch<NotifResponse>('/api/notifications?limit=50');
       setNotifications(res.data ?? []);
       setUnreadCount(res.unreadCount ?? 0);
     } catch {
+      setError(true);
       setNotifications([]);
     } finally {
       setLoading(false);
@@ -150,6 +154,8 @@ export function AlertesScreen() {
       </View>
     );
   }
+
+  if (error) return <ErrorState onRetry={load} />;
 
   return (
     <ScrollView

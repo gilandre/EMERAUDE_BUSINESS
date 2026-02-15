@@ -9,6 +9,7 @@ import { typography, spacing } from '../theme';
 import { apiFetch } from '../api/client';
 import { useDebounce } from '../hooks/useDebounce';
 import { formatMontant, formatDate } from '../utils/format';
+import { ErrorState } from '../components/ErrorState';
 
 interface DecaissementItem {
   id: string;
@@ -26,12 +27,15 @@ export function DecaissementsAJustifierScreen({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 400);
+  const [error, setError] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
+      setError(false);
       const res = await apiFetch<any>('/api/decaissements?sansJustificatif=true');
       setItems(res.decaissements || res.data || []);
     } catch {
+      setError(true);
       setItems([]);
     } finally {
       setLoading(false);
@@ -80,6 +84,8 @@ export function DecaissementsAJustifierScreen({ navigation }: any) {
       </View>
     );
   }
+
+  if (error) return <ErrorState onRetry={fetchData} />;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

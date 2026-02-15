@@ -16,6 +16,7 @@ import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
 import { SectionHeader } from '../components/SectionHeader';
 import { apiFetch } from '../api/client';
+import { ErrorState } from '../components/ErrorState';
 
 type NavParams = { BeneficiaireDetail: { id: string } };
 
@@ -49,9 +50,11 @@ export function BeneficiaireDetailScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
+      setError(false);
       const res = await apiFetch<any>(`/api/beneficiaires/${id}`);
       const b = res.beneficiaire || res;
       setBeneficiaire(b);
@@ -65,6 +68,7 @@ export function BeneficiaireDetailScreen() {
         statut: d.statut || 'Payé',
       })));
     } catch {
+      setError(true);
       setBeneficiaire(null);
       setTransactions([]);
     } finally {
@@ -101,6 +105,8 @@ export function BeneficiaireDetailScreen() {
       </View>
     );
   }
+
+  if (error) return <ErrorState onRetry={fetchData} />;
 
   const nom = beneficiaire?.nom || 'Bénéficiaire';
   const modePaiement = beneficiaire?.modePaiement || 'Non renseigné';

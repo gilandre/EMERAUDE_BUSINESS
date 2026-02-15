@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/get-session";
 import { hasPermission } from "@/lib/permissions";
 import { createAccompteSchema } from "@/validations/accompte.schema";
+import { getRequestIp } from "@/lib/request-ip";
 
 export async function GET(request: NextRequest) {
   const session = await getSession(request);
@@ -89,6 +90,7 @@ export async function POST(request: NextRequest) {
       action: "CREATE",
       entity: "Accompte",
       entityId: accompte.id,
+      ipAddress: getRequestIp(request) ?? undefined,
       newData: { marcheId, montant, dateEncaissement },
       description: `Accompte créé: ${montant} ${deviseSym} - Marché ${marcheId}`,
     },

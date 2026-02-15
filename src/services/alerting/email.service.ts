@@ -43,6 +43,18 @@ export class EmailService {
     }
 
     if (!credentials?.host || !credentials?.user) {
+      // Fallback dev : Ethereal (compte test gratuit Nodemailer)
+      if (process.env.NODE_ENV === "development") {
+        const testAccount = await nodemailer.createTestAccount();
+        this.transporter = nodemailer.createTransport({
+          host: "smtp.ethereal.email",
+          port: 587,
+          auth: { user: testAccount.user, pass: testAccount.pass },
+        });
+        console.log(`[Email] Mode dev Ethereal — Login: ${testAccount.user}`);
+        this.initialized = true;
+        return;
+      }
       throw new Error("Service email non configuré (DB ou EMAIL_HOST/EMAIL_USER dans .env)");
     }
 
@@ -66,12 +78,17 @@ export class EmailService {
 
     const from = process.env.EMAIL_FROM ?? process.env.SMTP_FROM ?? "noreply@emeraude-business.local";
 
-    await this.transporter!.sendMail({
+    const info = await this.transporter!.sendMail({
       from,
       to,
       subject: subject ?? "Alerte Emeraude Business",
       html,
     });
+
+    if (process.env.NODE_ENV === "development") {
+      const previewUrl = nodemailer.getTestMessageUrl(info);
+      if (previewUrl) console.log(`[Email] Preview: ${previewUrl}`);
+    }
   }
 
   async sendWithAttachment(
@@ -86,13 +103,18 @@ export class EmailService {
 
     const from = process.env.EMAIL_FROM ?? process.env.SMTP_FROM ?? "noreply@emeraude-business.local";
 
-    await this.transporter!.sendMail({
+    const info = await this.transporter!.sendMail({
       from,
       to,
       subject,
       html,
       attachments: [{ filename: attachment.filename, content: attachment.content }],
     });
+
+    if (process.env.NODE_ENV === "development") {
+      const previewUrl = nodemailer.getTestMessageUrl(info);
+      if (previewUrl) console.log(`[Email] Preview: ${previewUrl}`);
+    }
   }
 }
 

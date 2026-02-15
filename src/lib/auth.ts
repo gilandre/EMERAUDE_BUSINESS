@@ -5,6 +5,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
+import { getRequestIp } from "./request-ip";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -24,14 +25,12 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Identifiants manquants");
         }
 
-        const getIp = () => {
+        const ipAddress = (() => {
           const headers = (req as { headers?: Headers })?.headers;
           if (!headers) return null;
-          const forwarded = headers.get?.("x-forwarded-for");
-          if (forwarded) return forwarded.split(",")[0]?.trim() ?? null;
-          return headers.get?.("x-real-ip") ?? null;
-        };
-        const ipAddress = getIp();
+          const fakeReq = { headers } as Request;
+          return getRequestIp(fakeReq);
+        })();
 
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },

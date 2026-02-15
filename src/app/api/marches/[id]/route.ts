@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/get-session";
 import { hasPermission } from "@/lib/permissions";
 import { updateMarcheSchema } from "@/validations/marche.schema";
+import { getRequestIp } from "@/lib/request-ip";
+import { cacheDelByPrefix } from "@/lib/cache";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -181,6 +183,8 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
   if (parsed.data.dateFin !== undefined) data.dateFin = parsed.data.dateFin ? new Date(parsed.data.dateFin) : null;
   if (parsed.data.statut !== undefined) data.statut = parsed.data.statut;
 
+  void cacheDelByPrefix("marches");
+
   const marche = await prisma.marche.update({
     where: { id },
     data,
@@ -192,6 +196,7 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
       action: "UPDATE",
       entity: "Marche",
       entityId: marche.id,
+      ipAddress: getRequestIp(req) ?? undefined,
       newData: data,
       description: `Marché modifié: ${marche.libelle} (${marche.code})`,
     },
@@ -224,6 +229,8 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const libelle = marche.libelle;
   const code = marche.code;
 
+  void cacheDelByPrefix("marches");
+
   await prisma.marche.delete({ where: { id } });
 
   void prisma.auditLog.create({
@@ -232,6 +239,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       action: "DELETE",
       entity: "Marche",
       entityId: id,
+      ipAddress: getRequestIp(request) ?? undefined,
       description: `Marché supprimé: ${libelle} (${code})`,
     },
   });

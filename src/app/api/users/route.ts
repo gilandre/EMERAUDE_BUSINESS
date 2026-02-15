@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { createUserSchema } from "@/validations/user.schema";
+import { getRequestIp } from "@/lib/request-ip";
 
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -129,6 +130,7 @@ export async function POST(request: NextRequest) {
       action: "CREATE",
       entity: "User",
       entityId: user.id,
+      ipAddress: getRequestIp(request) ?? undefined,
       description: `Utilisateur créé: ${user.email}`,
     },
   });

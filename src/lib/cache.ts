@@ -69,4 +69,8 @@ export const CACHE_TTL = {
   MENUS: 1800,           // 30min
   DASHBOARD: 300,        // 5min
   CONFIG: 3600,          // 1h
+  MARCHES_LIST: 120,     // 2min
+  DEVISES: 1800,         // 30min
+  PROFILS: 600,          // 10min
+  USERS_LIST: 60,        // 1min
 } as const;

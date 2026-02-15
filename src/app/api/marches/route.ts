@@ -7,7 +7,8 @@ import { createMarcheSchema } from "@/validations/marche.schema";
 import { sanitizeString } from "@/lib/sanitize";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { conversionService } from "@/services/devises/conversion.service";
-import { cacheGet, cacheSet, cacheDelByPrefix } from "@/lib/cache";
+import { cacheGet, cacheSet, cacheDelByPrefix, CACHE_TTL } from "@/lib/cache";
+import { getRequestIp } from "@/lib/request-ip";
 
 export async function GET(request: NextRequest) {
   const rateLimitRes = await consumeRateLimit(request);
@@ -169,7 +170,7 @@ export async function GET(request: NextRequest) {
     counts,
   };
 
-  await cacheSet(cacheKey, payload, 60);
+  await cacheSet(cacheKey, payload, CACHE_TTL.MARCHES_LIST);
   return NextResponse.json(payload);
 }
 
@@ -238,6 +239,7 @@ export async function POST(request: NextRequest) {
       action: "CREATE",
       entity: "Marche",
       entityId: marche.id,
+      ipAddress: getRequestIp(request) ?? undefined,
       newData: { code: marche.code, libelle: marche.libelle, montant: Number(marche.montantTotal) },
       description: `Marché créé: ${marche.libelle} (${marche.code})`,
     },

@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { updateUserSchema } from "@/validations/user.schema";
 import { invalidatePermissionsCache } from "@/lib/permissions";
+import { getRequestIp } from "@/lib/request-ip";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -133,6 +134,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       action: "UPDATE",
       entity: "User",
       entityId: user.id,
+      ipAddress: getRequestIp(request) ?? undefined,
       description: `Utilisateur modifié: ${user.email}`,
       newData: data,
     },
@@ -141,7 +143,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   return NextResponse.json(user);
 }
 
-export async function DELETE(_request: NextRequest, { params }: RouteParams) {
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -171,6 +173,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
       action: "DELETE",
       entity: "User",
       entityId: id,
+      ipAddress: getRequestIp(request) ?? undefined,
       description: `Utilisateur supprimé: ${user.email}`,
     },
   });

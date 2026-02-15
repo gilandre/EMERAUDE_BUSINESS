@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { createProfilSchema } from "@/validations/profil.schema";
+import { cacheGet, cacheSet, cacheDelByPrefix, CACHE_TTL } from "@/lib/cache";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -16,6 +17,10 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const cacheKey = "profils:list";
+  const cached = await cacheGet<object[]>(cacheKey);
+  if (cached) return NextResponse.json(cached);
+
   const profils = await prisma.profil.findMany({
     orderBy: { code: "asc" },
     include: {
@@ -26,6 +31,7 @@ export async function GET() {
     },
   });
 
+  await cacheSet(cacheKey, profils, CACHE_TTL.PROFILS);
   return NextResponse.json(profils);
 }
 
@@ -55,6 +61,8 @@ export async function POST(request: NextRequest) {
   if (existing) {
     return NextResponse.json({ error: "Un profil avec ce code existe déjà" }, { status: 400 });
   }
+
+  void cacheDelByPrefix("profils:list");
 
   const profil = await prisma.profil.create({
     data: {

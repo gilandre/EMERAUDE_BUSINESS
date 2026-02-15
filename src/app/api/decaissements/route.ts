@@ -4,6 +4,7 @@ import { getSession } from "@/lib/get-session";
 import { hasPermission } from "@/lib/permissions";
 import { createDecaissementSchema } from "@/validations/decaissement.schema";
 import { cacheGet, cacheSet, cacheDelByPrefix } from "@/lib/cache";
+import { getRequestIp } from "@/lib/request-ip";
 
 async function getSoldeMarche(marcheId: string): Promise<{ encaissements: number; decaissements: number; prefinancement: number }> {
   const [acc, dec, pre] = await Promise.all([
@@ -173,6 +174,7 @@ export async function POST(request: NextRequest) {
       action: "CREATE",
       entity: "Decaissement",
       entityId: decaissement.id,
+      ipAddress: getRequestIp(request) ?? undefined,
       newData: { marcheId, montant, dateDecaissement, motif, beneficiaire, source },
       description: `Décaissement créé: ${montant} ${deviseSym} → ${beneficiaire} (${motif}) [${source}] - Marché ${marcheId}`,
     },

@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { randomBytes } from "crypto";
 import { emailService } from "@/services/alerting/email.service";
+import { getRequestIp } from "@/lib/request-ip";
 
 const TOKEN_EXPIRY_HOURS = 24;
 
@@ -82,6 +83,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       action: "PASSWORD_RESET_REQUESTED",
       entity: "User",
       entityId: id,
+      ipAddress: getRequestIp(request) ?? undefined,
       description: `Réinitialisation mot de passe demandée pour ${user.email}`,
     },
   });

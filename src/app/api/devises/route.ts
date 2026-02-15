@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
+import { cacheGet, cacheSet, cacheDelByPrefix, CACHE_TTL } from "@/lib/cache";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -17,28 +18,37 @@ export async function GET(request: NextRequest) {
     if (!canRead) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+
+    const cacheKey = "devises:list:all";
+    const cached = await cacheGet<object[]>(cacheKey);
+    if (cached) return NextResponse.json(cached);
+
     const devises = await prisma.devise.findMany({
       orderBy: [{ isDefault: "desc" }, { code: "asc" }],
     });
-    return NextResponse.json(
-      devises.map((d) => ({
-        ...d,
-        tauxVersXOF: Number(d.tauxVersXOF),
-      }))
-    );
+    const payload = devises.map((d) => ({
+      ...d,
+      tauxVersXOF: Number(d.tauxVersXOF),
+    }));
+    await cacheSet(cacheKey, payload, CACHE_TTL.DEVISES);
+    return NextResponse.json(payload);
   }
+
+  const cacheKey = "devises:list:active";
+  const cached = await cacheGet<object[]>(cacheKey);
+  if (cached) return NextResponse.json(cached);
 
   const devises = await prisma.devise.findMany({
     where: { isActive: true },
     orderBy: [{ isDefault: "desc" }, { code: "asc" }],
   });
 
-  return NextResponse.json(
-    devises.map((d) => ({
-      ...d,
-      tauxVersXOF: Number(d.tauxVersXOF),
-    }))
-  );
+  const payload = devises.map((d) => ({
+    ...d,
+    tauxVersXOF: Number(d.tauxVersXOF),
+  }));
+  await cacheSet(cacheKey, payload, CACHE_TTL.DEVISES);
+  return NextResponse.json(payload);
 }
 
 export async function POST(request: NextRequest) {
@@ -66,6 +76,8 @@ export async function POST(request: NextRequest) {
   if (existing) {
     return NextResponse.json({ error: "Une devise avec ce code existe déjà" }, { status: 400 });
   }
+
+  void cacheDelByPrefix("devises:list");
 
   const devise = await prisma.devise.create({
     data: {

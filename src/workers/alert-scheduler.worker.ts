@@ -15,13 +15,28 @@ async function evaluateTresorerieFaible(): Promise<void> {
     include: { prefinancement: true },
   });
 
+  const marcheIds = marches.map((m) => m.id);
+
+  // 2 requêtes groupBy au lieu de 2N requêtes aggregate
+  const [accGrouped, decGrouped] = await Promise.all([
+    prisma.accompte.groupBy({
+      by: ["marcheId"],
+      where: { marcheId: { in: marcheIds } },
+      _sum: { montant: true },
+    }),
+    prisma.decaissement.groupBy({
+      by: ["marcheId"],
+      where: { marcheId: { in: marcheIds } },
+      _sum: { montant: true },
+    }),
+  ]);
+
+  const accMap = new Map(accGrouped.map((a) => [a.marcheId, Number(a._sum.montant ?? 0)]));
+  const decMap = new Map(decGrouped.map((d) => [d.marcheId, Number(d._sum.montant ?? 0)]));
+
   for (const m of marches) {
-    const [acc, dec] = await Promise.all([
-      prisma.accompte.aggregate({ where: { marcheId: m.id }, _sum: { montant: true } }),
-      prisma.decaissement.aggregate({ where: { marcheId: m.id }, _sum: { montant: true } }),
-    ]);
-    const enc = Number(acc._sum.montant ?? 0);
-    const decSum = Number(dec._sum.montant ?? 0);
+    const enc = accMap.get(m.id) ?? 0;
+    const decSum = decMap.get(m.id) ?? 0;
     const preMax = m.prefinancement ? Number(m.prefinancement.montant) : 0;
     const preUtilise = m.prefinancement ? Number(m.prefinancement.montantUtilise) : 0;
     const solde = enc - decSum + (preMax - preUtilise);

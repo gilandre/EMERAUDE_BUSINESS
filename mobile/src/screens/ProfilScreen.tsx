@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import {
@@ -40,14 +41,14 @@ export function ProfilScreen() {
   const displayName = user?.name || [user?.prenom, user?.nom].filter(Boolean).join(' ') || 'Utilisateur';
 
   const accountItems: MenuItem[] = [
-    { icon: <UserCircle size={20} color={colors.primary} />, label: 'Informations personnelles' },
-    { icon: <Shield size={20} color={colors.primary} />, label: 'Sécurité & mot de passe' },
+    { icon: <UserCircle size={20} color={colors.primary} />, label: 'Informations personnelles', onPress: () => Alert.alert('Informations personnelles', 'Cette fonctionnalité sera disponible prochainement.') },
+    { icon: <Shield size={20} color={colors.primary} />, label: 'Sécurité & mot de passe', onPress: () => Alert.alert('Sécurité', 'Cette fonctionnalité sera disponible prochainement.') },
     { icon: <Mail size={20} color={colors.primary} />, label: 'Notifications email', onPress: () => navigation.navigate('ParametresNotifications') },
   ];
 
   const companyItems: MenuItem[] = [
-    { icon: <Building2 size={20} color={colors.primary} />, label: 'Informations entreprise' },
-    { icon: <Users size={20} color={colors.primary} />, label: 'Équipe & permissions' },
+    { icon: <Building2 size={20} color={colors.primary} />, label: 'Informations entreprise', onPress: () => Alert.alert('Informations entreprise', 'Cette fonctionnalité sera disponible prochainement.') },
+    { icon: <Users size={20} color={colors.primary} />, label: 'Équipe & permissions', onPress: () => Alert.alert('Équipe & permissions', 'Gérez votre équipe et les permissions depuis le portail web.') },
   ];
 
   const preferenceItems: MenuItem[] = [
@@ -84,7 +85,7 @@ export function ProfilScreen() {
               {displayName.charAt(0).toUpperCase()}
             </Text>
           </View>
-          <TouchableOpacity style={[styles.editAvatarBtn, { borderColor: colors.background }]}>
+          <TouchableOpacity style={[styles.editAvatarBtn, { borderColor: colors.background }]} onPress={() => Alert.alert('Photo de profil', 'Cette fonctionnalité sera disponible prochainement.')}>
             <Pencil size={14} color="#fff" />
           </TouchableOpacity>
         </View>

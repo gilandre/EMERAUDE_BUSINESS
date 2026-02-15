@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Bell, Mail, Smartphone, Clock } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
@@ -14,6 +15,7 @@ import { typography, spacing } from '../theme';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { SectionHeader } from '../components/SectionHeader';
+import { apiFetch } from '../api/client';
 
 const FREQUENCY_OPTIONS = [
   { key: 'quotidien', label: 'Quotidien' },
@@ -30,9 +32,52 @@ export function ConfigurationRappelsScreen() {
   const [pushEnabled, setPushEnabled] = useState(true);
   const [emailEnabled, setEmailEnabled] = useState(true);
   const [smsEnabled, setSmsEnabled] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loadingPrefs, setLoadingPrefs] = useState(true);
 
-  const handleSave = () => {
-    Alert.alert('Succès', 'Réglages de rappels appliqués avec succès');
+  const loadPreferences = useCallback(async () => {
+    try {
+      const prefs = await apiFetch<any>('/api/users/me/preferences');
+      if (prefs.rappels) {
+        const r = prefs.rappels;
+        if (r.autoReminders !== undefined) setAutoReminders(r.autoReminders);
+        if (r.frequency) setFrequency(r.frequency);
+        if (r.gracePeriod) setGracePeriod(String(r.gracePeriod));
+        if (r.pushEnabled !== undefined) setPushEnabled(r.pushEnabled);
+        if (r.emailEnabled !== undefined) setEmailEnabled(r.emailEnabled);
+        if (r.smsEnabled !== undefined) setSmsEnabled(r.smsEnabled);
+      }
+    } catch {
+      // Use defaults
+    } finally {
+      setLoadingPrefs(false);
+    }
+  }, []);
+
+  useEffect(() => { loadPreferences(); }, [loadPreferences]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await apiFetch('/api/users/me/preferences', {
+        method: 'PUT',
+        body: JSON.stringify({
+          rappels: {
+            autoReminders,
+            frequency,
+            gracePeriod: parseInt(gracePeriod, 10) || 7,
+            pushEnabled,
+            emailEnabled,
+            smsEnabled,
+          },
+        }),
+      });
+      Alert.alert('Succès', 'Réglages de rappels appliqués avec succès');
+    } catch {
+      Alert.alert('Erreur', 'Impossible de sauvegarder les réglages');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const channels = [
@@ -166,9 +211,11 @@ export function ConfigurationRappelsScreen() {
       <Button
         title="Appliquer les réglages"
         onPress={handleSave}
+        loading={saving}
+        disabled={saving}
         size="lg"
         style={st.submitBtn}
-        icon={<Bell size={18} color="#fff" />}
+        icon={!saving ? <Bell size={18} color="#fff" /> : undefined}
       />
 
       <View style={{ height: spacing.xxl }} />

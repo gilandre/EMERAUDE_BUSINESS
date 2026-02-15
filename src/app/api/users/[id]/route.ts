@@ -33,6 +33,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       nom: true,
       prenom: true,
       active: true,
+      mobileAccess: true,
       lastLoginAt: true,
       createdAt: true,
       profilId: true,
@@ -95,12 +96,13 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 404 });
   }
 
-  const data: { email?: string; nom?: string | null; prenom?: string | null; name?: string | null; profilId?: string | null; active?: boolean } = {};
+  const data: { email?: string; nom?: string | null; prenom?: string | null; name?: string | null; profilId?: string | null; active?: boolean; mobileAccess?: boolean } = {};
   if (parsed.data.email !== undefined) data.email = parsed.data.email;
   if (parsed.data.nom !== undefined) data.nom = parsed.data.nom ?? null;
   if (parsed.data.prenom !== undefined) data.prenom = parsed.data.prenom ?? null;
   if (parsed.data.profilId !== undefined) data.profilId = parsed.data.profilId ?? null;
   if (parsed.data.active !== undefined) data.active = parsed.data.active;
+  if (parsed.data.mobileAccess !== undefined) data.mobileAccess = parsed.data.mobileAccess;
   if (parsed.data.nom !== undefined || parsed.data.prenom !== undefined) {
     const nom = parsed.data.nom ?? existing.nom ?? "";
     const prenom = parsed.data.prenom ?? existing.prenom ?? "";
@@ -117,6 +119,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       nom: true,
       prenom: true,
       active: true,
+      mobileAccess: true,
       profilId: true,
       profil: { select: { code: true, libelle: true } },
       updatedAt: true,

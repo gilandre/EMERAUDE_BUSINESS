@@ -10,7 +10,14 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  LayoutAnimation,
+  UIManager,
 } from 'react-native';
+
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import { useRoute, RouteProp } from '@react-navigation/native';
 import {
   Calendar,
@@ -18,6 +25,9 @@ import {
   ArrowDownLeft,
   CreditCard,
   ArrowUpRight,
+  ChevronDown,
+  ChevronUp,
+  Plus,
 } from 'lucide-react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { Card } from '../components/Card';
@@ -37,6 +47,7 @@ import {
   type Accompte,
   type Decaissement,
 } from '../api/marches';
+import { formatMontant as fmtUtil, formatTimeAgo as fmtTimeAgoUtil } from '../utils/format';
 
 type NavParams = { MarcheDetail: { id: string } };
 type Section = 'apercu' | 'encaissements' | 'decaissements';
@@ -78,6 +89,10 @@ export function MarcheDetailScreen() {
   const [decModePaiement, setDecModePaiement] = useState('');
   const [decSource, setDecSource] = useState<'TRESORERIE' | 'PREFINANCEMENT'>('TRESORERIE');
   const [decSubmitting, setDecSubmitting] = useState(false);
+
+  // Collapsible form states
+  const [showEncForm, setShowEncForm] = useState(false);
+  const [showDecForm, setShowDecForm] = useState(false);
 
   // Prefinancement form
   const [prefMontant, setPrefMontant] = useState('');
@@ -511,30 +526,6 @@ export function MarcheDetailScreen() {
         {/* Encaissements Tab */}
         {section === 'encaissements' && (
           <>
-            <Card>
-              <SectionHeader title="Encaisser un accompte" style={{ marginTop: 0 }} />
-              <Input
-                label="Montant *"
-                value={accompteMontant}
-                onChangeText={setAccompteMontant}
-                placeholder="0"
-                keyboardType="decimal-pad"
-              />
-              <DatePickerInput
-                label="Date d'encaissement"
-                value={accompteDate}
-                onChange={setAccompteDate}
-              />
-              <Input label="Référence (optionnel)" value={accompteRef} onChangeText={setAccompteRef} />
-              <Input label="Description (optionnel)" value={accompteDesc} onChangeText={setAccompteDesc} />
-              <Button
-                title="Enregistrer l'accompte"
-                onPress={handleEncaisserAccompte}
-                loading={accompteSubmitting}
-                disabled={accompteSubmitting}
-              />
-            </Card>
-
             <SectionHeader title="Derniers encaissements" />
             {(data.accomptes ?? []).slice(0, 10).map((a: Accompte) => (
               <Card key={a.id}>
@@ -553,80 +544,51 @@ export function MarcheDetailScreen() {
             {(!data.accomptes || data.accomptes.length === 0) && (
               <Text style={styles.emptyList}>Aucun encaissement</Text>
             )}
+
+            {/* Collapsible form */}
+            <TouchableOpacity
+              style={styles.addFormToggle}
+              onPress={() => {
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                setShowEncForm(!showEncForm);
+              }}
+              activeOpacity={0.7}
+            >
+              <Plus size={18} color={colors.primary} />
+              <Text style={styles.addFormToggleText}>Nouvel encaissement</Text>
+              {showEncForm ? <ChevronUp size={18} color={colors.textMuted} /> : <ChevronDown size={18} color={colors.textMuted} />}
+            </TouchableOpacity>
+
+            {showEncForm && (
+              <Card>
+                <Input
+                  label="Montant *"
+                  value={accompteMontant}
+                  onChangeText={setAccompteMontant}
+                  placeholder="0"
+                  keyboardType="decimal-pad"
+                />
+                <DatePickerInput
+                  label="Date d'encaissement"
+                  value={accompteDate}
+                  onChange={setAccompteDate}
+                />
+                <Input label="Référence (optionnel)" value={accompteRef} onChangeText={setAccompteRef} />
+                <Input label="Description (optionnel)" value={accompteDesc} onChangeText={setAccompteDesc} />
+                <Button
+                  title="Enregistrer l'accompte"
+                  onPress={handleEncaisserAccompte}
+                  loading={accompteSubmitting}
+                  disabled={accompteSubmitting}
+                />
+              </Card>
+            )}
           </>
         )}
 
         {/* Décaissements Tab */}
         {section === 'decaissements' && (
           <>
-            <Card>
-              <SectionHeader title="Décaisser" style={{ marginTop: 0 }} />
-              <Text style={styles.hint}>Disponible : {formatMontant(soldeDisponible, data.deviseCode)}</Text>
-              <Input
-                label="Montant *"
-                value={decMontant}
-                onChangeText={setDecMontant}
-                placeholder="0"
-                keyboardType="decimal-pad"
-              />
-              <Input
-                label="Bénéficiaire *"
-                value={decBeneficiaire}
-                onChangeText={setDecBeneficiaire}
-                placeholder="Nom du bénéficiaire"
-              />
-              <Input
-                label="Motif *"
-                value={decMotif}
-                onChangeText={setDecMotif}
-                placeholder="Raison du décaissement"
-              />
-
-              <Text style={styles.fieldLabel}>SOURCE DES FONDS</Text>
-              <View style={styles.segmentedSmall}>
-                {(['TRESORERIE', 'PREFINANCEMENT'] as const).map((s) => (
-                  <TouchableOpacity
-                    key={s}
-                    onPress={() => setDecSource(s)}
-                    style={[styles.segmentSmallBtn, decSource === s && styles.segmentSmallActive]}
-                  >
-                    <Text style={[styles.segmentSmallText, decSource === s && styles.segmentSmallTextActive]}>
-                      {SOURCE_LABELS[s]}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <Text style={styles.fieldLabel}>MODE DE PAIEMENT</Text>
-              <View style={styles.segmentedSmall}>
-                {MODE_PAIEMENT_OPTIONS.map((opt) => (
-                  <TouchableOpacity
-                    key={opt.value}
-                    onPress={() => setDecModePaiement(decModePaiement === opt.value ? '' : opt.value)}
-                    style={[styles.segmentSmallBtn, decModePaiement === opt.value && styles.segmentSmallActive]}
-                  >
-                    <Text style={[styles.segmentSmallText, decModePaiement === opt.value && styles.segmentSmallTextActive]}>
-                      {opt.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <DatePickerInput
-                label="Date de décaissement"
-                value={decDate}
-                onChange={setDecDate}
-              />
-              <Input label="Référence (optionnel)" value={decRef} onChangeText={setDecRef} />
-              <Input label="Description (optionnel)" value={decDesc} onChangeText={setDecDesc} />
-              <Button
-                title="Enregistrer le décaissement"
-                onPress={handleDecaisser}
-                loading={decSubmitting}
-                disabled={decSubmitting}
-              />
-            </Card>
-
             <SectionHeader title="Derniers décaissements" />
             {(data.decaissements ?? []).slice(0, 10).map((d: Decaissement) => (
               <Card key={d.id}>
@@ -653,6 +615,89 @@ export function MarcheDetailScreen() {
             ))}
             {(!data.decaissements || data.decaissements.length === 0) && (
               <Text style={styles.emptyList}>Aucun décaissement</Text>
+            )}
+
+            {/* Collapsible form */}
+            <TouchableOpacity
+              style={styles.addFormToggle}
+              onPress={() => {
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                setShowDecForm(!showDecForm);
+              }}
+              activeOpacity={0.7}
+            >
+              <Plus size={18} color={colors.primary} />
+              <Text style={styles.addFormToggleText}>Nouveau décaissement</Text>
+              {showDecForm ? <ChevronUp size={18} color={colors.textMuted} /> : <ChevronDown size={18} color={colors.textMuted} />}
+            </TouchableOpacity>
+
+            {showDecForm && (
+              <Card>
+                <Text style={styles.hint}>Disponible : {formatMontant(soldeDisponible, data.deviseCode)}</Text>
+                <Input
+                  label="Montant *"
+                  value={decMontant}
+                  onChangeText={setDecMontant}
+                  placeholder="0"
+                  keyboardType="decimal-pad"
+                />
+                <Input
+                  label="Bénéficiaire *"
+                  value={decBeneficiaire}
+                  onChangeText={setDecBeneficiaire}
+                  placeholder="Nom du bénéficiaire"
+                />
+                <Input
+                  label="Motif *"
+                  value={decMotif}
+                  onChangeText={setDecMotif}
+                  placeholder="Raison du décaissement"
+                />
+
+                <Text style={styles.fieldLabel}>SOURCE DES FONDS</Text>
+                <View style={styles.segmentedSmall}>
+                  {(['TRESORERIE', 'PREFINANCEMENT'] as const).map((s) => (
+                    <TouchableOpacity
+                      key={s}
+                      onPress={() => setDecSource(s)}
+                      style={[styles.segmentSmallBtn, decSource === s && styles.segmentSmallActive]}
+                    >
+                      <Text style={[styles.segmentSmallText, decSource === s && styles.segmentSmallTextActive]}>
+                        {SOURCE_LABELS[s]}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={styles.fieldLabel}>MODE DE PAIEMENT</Text>
+                <View style={styles.segmentedSmall}>
+                  {MODE_PAIEMENT_OPTIONS.map((opt) => (
+                    <TouchableOpacity
+                      key={opt.value}
+                      onPress={() => setDecModePaiement(decModePaiement === opt.value ? '' : opt.value)}
+                      style={[styles.segmentSmallBtn, decModePaiement === opt.value && styles.segmentSmallActive]}
+                    >
+                      <Text style={[styles.segmentSmallText, decModePaiement === opt.value && styles.segmentSmallTextActive]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <DatePickerInput
+                  label="Date de décaissement"
+                  value={decDate}
+                  onChange={setDecDate}
+                />
+                <Input label="Référence (optionnel)" value={decRef} onChangeText={setDecRef} />
+                <Input label="Description (optionnel)" value={decDesc} onChangeText={setDecDesc} />
+                <Button
+                  title="Enregistrer le décaissement"
+                  onPress={handleDecaisser}
+                  loading={decSubmitting}
+                  disabled={decSubmitting}
+                />
+              </Card>
             )}
           </>
         )}
@@ -868,6 +913,26 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.regular,
     color: colors.textMuted,
     fontStyle: 'italic',
+  },
+  addFormToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primaryTint,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(16,183,127,0.2)',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  addFormToggleText: {
+    flex: 1,
+    fontSize: typography.fontSizes.sm,
+    fontFamily: typography.fontFamily.semibold,
+    fontWeight: typography.fontWeights.semibold as '600',
+    color: colors.primary,
   },
   bottomPad: { height: spacing.xxl },
 

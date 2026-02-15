@@ -34,6 +34,7 @@ import {
   UserCheck,
   UserX,
   LogIn,
+  Smartphone,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -51,6 +52,7 @@ export default function AdminUtilisateursPage() {
     nom: "",
     prenom: "",
     profilId: "",
+    mobileAccess: false,
   });
 
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -78,7 +80,7 @@ export default function AdminUtilisateursPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (payload: { email: string; password: string; nom?: string; prenom?: string; profilId?: string }) => {
+    mutationFn: async (payload: { email: string; password: string; nom?: string; prenom?: string; profilId?: string; mobileAccess?: boolean }) => {
       const res = await fetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -91,14 +93,32 @@ export default function AdminUtilisateursPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       setModalOpen(false);
-      setForm({ email: "", password: "", nom: "", prenom: "", profilId: "" });
+      setForm({ email: "", password: "", nom: "", prenom: "", profilId: "", mobileAccess: false });
       toast.success("Utilisateur créé");
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const toggleMobileAccessMutation = useMutation({
+    mutationFn: async ({ id, mobileAccess }: { id: string; mobileAccess: boolean }) => {
+      const res = await fetch(`/api/users/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mobileAccess }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error ?? "Erreur");
+      return d;
+    },
+    onSuccess: (_, { mobileAccess }) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      toast.success(mobileAccess ? "Accès mobile activé" : "Accès mobile désactivé");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const updateMutation = useMutation({
-    mutationFn: async ({ id, ...payload }: { id: string; email?: string; nom?: string; prenom?: string; profilId?: string | null; active?: boolean }) => {
+    mutationFn: async ({ id, ...payload }: { id: string; email?: string; nom?: string; prenom?: string; profilId?: string | null; active?: boolean; mobileAccess?: boolean }) => {
       const res = await fetch(`/api/users/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -168,7 +188,7 @@ export default function AdminUtilisateursPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const openEdit = (u: { id: string; email: string; nom?: string | null; prenom?: string | null; profilId?: string | null }) => {
+  const openEdit = (u: { id: string; email: string; nom?: string | null; prenom?: string | null; profilId?: string | null; mobileAccess?: boolean }) => {
     setEditingId(u.id);
     setForm({
       email: u.email,
@@ -176,6 +196,7 @@ export default function AdminUtilisateursPage() {
       nom: u.nom ?? "",
       prenom: u.prenom ?? "",
       profilId: u.profilId ?? "",
+      mobileAccess: u.mobileAccess ?? false,
     });
     setModalOpen(true);
   };
@@ -189,6 +210,7 @@ export default function AdminUtilisateursPage() {
         nom: form.nom || undefined,
         prenom: form.prenom || undefined,
         profilId: form.profilId || null,
+        mobileAccess: form.mobileAccess,
       });
     } else {
       if (!form.password || form.password.length < 8) {
@@ -201,6 +223,7 @@ export default function AdminUtilisateursPage() {
         nom: form.nom || undefined,
         prenom: form.prenom || undefined,
         profilId: form.profilId || undefined,
+        mobileAccess: form.mobileAccess,
       });
     }
   };
@@ -212,7 +235,7 @@ export default function AdminUtilisateursPage() {
     <div className="space-y-6 p-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">Gestion des utilisateurs</h1>
-        <Button onClick={() => { setEditingId(null); setForm({ email: "", password: "", nom: "", prenom: "", profilId: "" }); setModalOpen(true); }}>
+        <Button onClick={() => { setEditingId(null); setForm({ email: "", password: "", nom: "", prenom: "", profilId: "", mobileAccess: false }); setModalOpen(true); }}>
           <Plus className="h-4 w-4 mr-2" />
           Nouvel utilisateur
         </Button>
@@ -249,12 +272,13 @@ export default function AdminUtilisateursPage() {
                     <TableHead>Nom</TableHead>
                     <TableHead>Profil</TableHead>
                     <TableHead>Statut</TableHead>
+                    <TableHead>Mobile</TableHead>
                     <TableHead>Dernière connexion</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((u: { id: string; email: string; name?: string | null; nom?: string | null; prenom?: string | null; active: boolean; lastLoginAt?: string | null; profil?: { code: string; libelle: string } | null }) => (
+                  {users.map((u: { id: string; email: string; name?: string | null; nom?: string | null; prenom?: string | null; active: boolean; mobileAccess?: boolean; lastLoginAt?: string | null; profilId?: string | null; profil?: { code: string; libelle: string } | null }) => (
                     <TableRow key={u.id}>
                       <TableCell className="font-medium">{u.email}</TableCell>
                       <TableCell>{u.name || `${u.prenom ?? ""} ${u.nom ?? ""}`.trim() || "—"}</TableCell>
@@ -265,6 +289,18 @@ export default function AdminUtilisateursPage() {
                         <Badge variant={u.active ? "default" : "secondary"}>
                           {u.active ? "Actif" : "Suspendu"}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <button
+                          onClick={() => toggleMobileAccessMutation.mutate({ id: u.id, mobileAccess: !u.mobileAccess })}
+                          title={u.mobileAccess ? "Désactiver accès mobile" : "Activer accès mobile"}
+                          className="inline-flex items-center gap-1"
+                        >
+                          <Smartphone className={`h-4 w-4 ${u.mobileAccess ? "text-emerald-500" : "text-muted-foreground/40"}`} />
+                          <span className={`text-xs ${u.mobileAccess ? "text-emerald-600 font-medium" : "text-muted-foreground"}`}>
+                            {u.mobileAccess ? "Oui" : "Non"}
+                          </span>
+                        </button>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {u.lastLoginAt ? formatDate(u.lastLoginAt) : "—"}
@@ -383,6 +419,19 @@ export default function AdminUtilisateursPage() {
                     })),
                   ]}
                 />
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="mobileAccess"
+                  checked={form.mobileAccess}
+                  onChange={(e) => setForm((p) => ({ ...p, mobileAccess: e.target.checked }))}
+                  className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <Label htmlFor="mobileAccess" className="flex items-center gap-2 cursor-pointer">
+                  <Smartphone className="h-4 w-4 text-muted-foreground" />
+                  Accès application mobile
+                </Label>
               </div>
             </div>
             <DialogFooter>

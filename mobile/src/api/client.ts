@@ -28,10 +28,28 @@ export async function setStoredUser(user: object): Promise<void> {
   await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
 }
 
+// In-memory cache with TTL for GET requests
+const cache = new Map<string, { data: unknown; timestamp: number }>();
+const CACHE_TTL = 30_000; // 30 seconds
+
+export function clearApiCache(): void {
+  cache.clear();
+}
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
+  const method = (options.method || 'GET').toUpperCase();
+
+  // Cache only GET requests
+  if (method === 'GET') {
+    const cached = cache.get(path);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return cached.data as T;
+    }
+  }
+
   const token = await getToken();
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -46,6 +64,14 @@ export async function apiFetch<T>(
 
   if (!res.ok) {
     throw new Error((data as { error?: string }).error || 'Erreur réseau');
+  }
+
+  // Cache GET responses
+  if (method === 'GET') {
+    cache.set(path, { data, timestamp: Date.now() });
+  } else {
+    // Invalidate cache on mutations
+    cache.clear();
   }
 
   return data as T;

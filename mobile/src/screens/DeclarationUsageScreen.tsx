@@ -348,6 +348,17 @@ export function DeclarationUsageScreen() {
                   borderColor: line.hasJustificatif ? colors.primary : colors.border,
                 },
               ]}
+              onPress={() => {
+                if (line.hasJustificatif) {
+                  // View the justificatif
+                  Alert.alert('Justificatif', 'Le justificatif est joint à cette ligne de dépense.', [
+                    { text: 'OK' },
+                  ]);
+                } else if (isEditable) {
+                  navigation.navigate('AjouterJustificatif', { lineId: line.id, declarationId });
+                }
+              }}
+              activeOpacity={0.7}
             >
               <FileText
                 size={16}

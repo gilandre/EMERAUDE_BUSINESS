@@ -49,6 +49,7 @@ export function CreateMarcheScreen() {
         deviseCode: deviseCode || 'XOF',
         dateDebut: dateDebut || undefined,
         dateFin: dateFin || undefined,
+        prefinancement,
       });
       Alert.alert('Succès', `Marché "${result.libelle}" créé (${result.code})`, [
         { text: 'OK', onPress: () => navigation.goBack() },

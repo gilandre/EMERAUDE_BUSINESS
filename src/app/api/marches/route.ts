@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
     { updatedAt: sortOrder };
 
   const needTresorerieFilter = tresorerie === "critique" || tresorerie === "faible" || tresorerie === "saine";
-  const fetchLimit = needTresorerieFilter ? 1000 : pageSize;
+  const fetchLimit = needTresorerieFilter ? 500 : pageSize;
   const fetchSkip = needTresorerieFilter ? 0 : skip;
 
   const [data, totalBeforeTreso] = await Promise.all([

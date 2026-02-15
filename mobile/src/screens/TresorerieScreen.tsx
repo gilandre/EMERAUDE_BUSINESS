@@ -10,6 +10,7 @@ import {
 import { useTheme } from '../context/ThemeContext';
 import { typography, spacing } from '../theme';
 import { apiFetch } from '../api/client';
+import { formatMontant } from '../utils/format';
 
 interface TresorerieData {
   soldeGlobal: number;
@@ -35,19 +36,8 @@ export function TresorerieScreen({ navigation }: any) {
 
   const fetchData = useCallback(async () => {
     try {
-      const [dashRes, benefRes, decAJustifRes] = await Promise.all([
-        apiFetch<any>('/api/dashboard?period=30d'),
-        apiFetch<any>('/api/beneficiaires?limit=1').catch(() => ({ total: 0 })),
-        apiFetch<any>('/api/decaissements?sansJustificatif=true&limit=1').catch(() => ({ total: 0 })),
-      ]);
-      setData({
-        soldeGlobal: dashRes.kpis?.tresorerie ?? 0,
-        totalEncaissementsMois: dashRes.kpis?.totalEncaissements ?? 0,
-        totalDecaissementsMois: dashRes.kpis?.totalDecaissements ?? 0,
-        decaissementsAJustifier: decAJustifRes.total ?? (decAJustifRes.decaissements?.length ?? 0),
-        totalBeneficiaires: benefRes.total ?? (benefRes.beneficiaires?.length ?? 0),
-        derniersMouvements: [],
-      });
+      const res = await apiFetch<TresorerieData>('/api/tresorerie/summary');
+      setData(res);
     } catch {
       // Fallback
       setData({
@@ -68,8 +58,7 @@ export function TresorerieScreen({ navigation }: any) {
 
   const onRefresh = () => { setRefreshing(true); fetchData(); };
 
-  const fmt = (n: number) =>
-    n.toLocaleString('fr-FR', { maximumFractionDigits: 0 });
+  const fmt = (n: number) => formatMontant(n, 'XOF').replace(' FCFA', '');
 
   if (loading) {
     return (
@@ -151,6 +140,31 @@ export function TresorerieScreen({ navigation }: any) {
         </View>
         <ChevronRight size={20} color={colors.textMuted} />
       </TouchableOpacity>
+
+      {/* Derniers mouvements */}
+      {data?.derniersMouvements && data.derniersMouvements.length > 0 && (
+        <>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Derniers mouvements</Text>
+          {data.derniersMouvements.map((m) => (
+            <View key={m.id} style={[styles.actionRow, { backgroundColor: colors.card }]}>
+              <View style={[styles.actionIcon, { backgroundColor: m.type === 'encaissement' ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)' }]}>
+                {m.type === 'encaissement' ? (
+                  <ArrowDownLeft size={18} color="#22c55e" />
+                ) : (
+                  <ArrowUpRight size={18} color="#f59e0b" />
+                )}
+              </View>
+              <View style={styles.actionText}>
+                <Text style={[styles.actionLabel, { color: colors.text }]} numberOfLines={1}>{m.libelle}</Text>
+                <Text style={[styles.actionSub, { color: colors.textMuted }]} numberOfLines={1}>{m.marcheLibelle}</Text>
+              </View>
+              <Text style={[styles.mvtAmount, { color: m.type === 'encaissement' ? '#22c55e' : '#f59e0b' }]}>
+                {m.type === 'encaissement' ? '+' : '-'}{fmt(m.montant)}
+              </Text>
+            </View>
+          ))}
+        </>
+      )}
 
       <View style={{ height: spacing.xxl }} />
     </ScrollView>
@@ -236,5 +250,10 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSizes.xs,
     fontFamily: typography.fontFamily.regular,
     marginTop: 2,
+  },
+  mvtAmount: {
+    fontSize: typography.fontSizes.sm,
+    fontFamily: typography.fontFamily.semibold,
+    fontWeight: '600',
   },
 });

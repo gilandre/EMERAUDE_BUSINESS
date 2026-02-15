@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -21,10 +21,12 @@ import {
   Search,
 } from 'lucide-react-native';
 import { ProgressBar } from '../components/ProgressBar';
+import { Skeleton, SkeletonCard } from '../components/Skeleton';
 import { typography, spacing } from '../theme';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api/client';
+import { formatMontantSplit, formatShort, formatTimeAgo } from '../utils/format';
 
 interface DashboardData {
   kpis?: {
@@ -77,9 +79,9 @@ export function DashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
-      const res = await apiFetch<DashboardData>('/api/dashboard?period=30d');
+      const res = await apiFetch<DashboardData>('/api/dashboard/kpis');
       setData(res);
     } catch {
       setData(null);
@@ -87,38 +89,18 @@ export function DashboardScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const onRefresh = () => {
     setRefreshing(true);
     load();
   };
 
-  const formatMontant = (n: number, devise = 'XOF') => {
-    const fmt = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(n);
-    return { value: fmt, suffix: devise === 'XOF' ? 'FCFA' : devise };
-  };
-
-  const formatShort = (n: number) => {
-    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-    if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
-    return String(n);
-  };
-
-  const formatTimeAgo = (d: string) => {
-    const date = new Date(d);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffH = Math.floor(diffMs / (1000 * 60 * 60));
-    if (diffH < 1) return 'À l\'instant';
-    if (diffH < 24) return `Il y a ${diffH}h`;
-    const diffD = Math.floor(diffH / 24);
-    return `Il y a ${diffD}j`;
-  };
+  const formatMontant = (n: number, devise = 'XOF') => formatMontantSplit(n, devise);
 
   const navigateToMarche = (id: string) => {
     (navigation as any).navigate('Marches', { screen: 'MarcheDetail', params: { id } });
@@ -126,9 +108,40 @@ export function DashboardScreen() {
 
   if (loading && !data) {
     return (
-      <View style={[st.centered, { backgroundColor: colors.background }]}>
-        <Text style={[st.loadingText, { color: colors.textSecondary }]}>Chargement...</Text>
-      </View>
+      <ScrollView style={[st.container, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: spacing.md }}>
+        {/* Skeleton header */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.lg }}>
+          <View style={{ gap: 8 }}>
+            <Skeleton width={180} height={20} />
+            <Skeleton width={120} height={14} />
+          </View>
+          <Skeleton width={40} height={40} borderRadius={20} />
+        </View>
+        {/* Skeleton KPI cards */}
+        <SkeletonCard style={{ marginBottom: spacing.md }}>
+          <Skeleton width={100} height={12} />
+          <Skeleton width={200} height={28} />
+        </SkeletonCard>
+        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+          <SkeletonCard style={{ flex: 1 }}>
+            <Skeleton width={60} height={12} />
+            <Skeleton width={90} height={20} />
+          </SkeletonCard>
+          <SkeletonCard style={{ flex: 1 }}>
+            <Skeleton width={60} height={12} />
+            <Skeleton width={90} height={20} />
+          </SkeletonCard>
+        </View>
+        {/* Skeleton chart */}
+        <SkeletonCard style={{ marginBottom: spacing.md }}>
+          <Skeleton width={140} height={14} />
+          <Skeleton height={80} />
+        </SkeletonCard>
+        {/* Skeleton list */}
+        <Skeleton width={120} height={14} style={{ marginBottom: spacing.sm }} />
+        <SkeletonCard><Skeleton height={50} /></SkeletonCard>
+        <SkeletonCard style={{ marginTop: spacing.sm }}><Skeleton height={50} /></SkeletonCard>
+      </ScrollView>
     );
   }
 
@@ -375,7 +388,9 @@ export function DashboardScreen() {
       <View style={st.sectionBlock}>
         <View style={st.sectionHeaderRow}>
           <Text style={[st.sectionTitle, { color: colors.text }]}>Prochaines échéances</Text>
-          <Text style={[st.seeAll, { color: colors.textMuted }]}>Voir tout</Text>
+          <TouchableOpacity onPress={() => (navigation as any).navigate('Marches')}>
+            <Text style={[st.seeAll, { color: colors.primary }]}>Voir tout</Text>
+          </TouchableOpacity>
         </View>
         {deadlines.length > 0 ? (
           <View style={[st.deadlineCard, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>

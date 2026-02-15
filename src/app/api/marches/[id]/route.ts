@@ -36,6 +36,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       updatedAt: true,
       accomptes: {
         orderBy: { dateEncaissement: "desc" },
+        take: 50,
         select: {
           id: true,
           marcheId: true,
@@ -49,6 +50,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       },
       decaissements: {
         orderBy: { dateDecaissement: "desc" },
+        take: 50,
         select: {
           id: true,
           marcheId: true,
@@ -78,10 +80,22 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Marché introuvable" }, { status: 404 });
   }
 
-  const totalAcc = marche.accomptes.reduce((s, a) => s + Number(a.montant), 0);
-  const totalDec = marche.decaissements.reduce((s, d) => s + Number(d.montant), 0);
-  const totalAccXOF = marche.accomptes.reduce((s, a) => s + Number(a.montantXOF), 0);
-  const totalDecXOF = marche.decaissements.reduce((s, d) => s + Number(d.montantXOF), 0);
+  // Use aggregates for accurate totals (not limited by take: 50)
+  const [accAgg, decAgg] = await Promise.all([
+    prisma.accompte.aggregate({
+      where: { marcheId: id },
+      _sum: { montant: true, montantXOF: true },
+    }),
+    prisma.decaissement.aggregate({
+      where: { marcheId: id },
+      _sum: { montant: true, montantXOF: true },
+    }),
+  ]);
+
+  const totalAcc = Number(accAgg._sum.montant ?? 0);
+  const totalDec = Number(decAgg._sum.montant ?? 0);
+  const totalAccXOF = Number(accAgg._sum.montantXOF ?? 0);
+  const totalDecXOF = Number(decAgg._sum.montantXOF ?? 0);
   const solde = totalAcc - totalDec;
   const soldeXOF = totalAccXOF - totalDecXOF;
   const prefinancementUtilise = marche.prefinancement ? Number(marche.prefinancement.montantUtilise) : 0;

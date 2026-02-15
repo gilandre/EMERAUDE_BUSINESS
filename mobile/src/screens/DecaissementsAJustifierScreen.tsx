@@ -7,6 +7,8 @@ import { Search, SlidersHorizontal, AlertTriangle, ChevronRight } from 'lucide-r
 import { useTheme } from '../context/ThemeContext';
 import { typography, spacing } from '../theme';
 import { apiFetch } from '../api/client';
+import { useDebounce } from '../hooks/useDebounce';
+import { formatMontant, formatDate } from '../utils/format';
 
 interface DecaissementItem {
   id: string;
@@ -23,6 +25,7 @@ export function DecaissementsAJustifierScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 400);
 
   const fetchData = useCallback(async () => {
     try {
@@ -40,16 +43,8 @@ export function DecaissementsAJustifierScreen({ navigation }: any) {
 
   const onRefresh = () => { setRefreshing(true); fetchData(); };
 
-  const fmt = (n: number) =>
-    n.toLocaleString('fr-FR', { maximumFractionDigits: 0 });
-
-  const fmtDate = (d: string) => {
-    const date = new Date(d);
-    return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
-  };
-
   const filtered = items.filter(i =>
-    i.beneficiaire.toLowerCase().includes(search.toLowerCase())
+    i.beneficiaire.toLowerCase().includes(debouncedSearch.toLowerCase())
   );
 
   const renderItem = ({ item }: { item: DecaissementItem }) => (
@@ -62,11 +57,11 @@ export function DecaissementsAJustifierScreen({ navigation }: any) {
           {item.beneficiaire}
         </Text>
         <Text style={[styles.cardAmount, { color: colors.text }]}>
-          {fmt(item.montant)} FCFA
+          {formatMontant(item.montant)}
         </Text>
       </View>
       <Text style={[styles.cardDate, { color: colors.textMuted }]}>
-        {fmtDate(item.dateDecaissement)}
+        {formatDate(item.dateDecaissement, 'long')}
       </Text>
       <View style={styles.badgeRow}>
         <View style={styles.badge}>

@@ -47,6 +47,7 @@ export function NouvelEncaissementScreen() {
   const [dateReception, setDateReception] = useState(new Date().toISOString().slice(0, 10));
   const [modeReglement, setModeReglement] = useState('especes');
   const [submitting, setSubmitting] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
 
   const fetchMarches = useCallback(async () => {
     try {
@@ -196,19 +197,27 @@ export function NouvelEncaissementScreen() {
           </View>
         </View>
 
-        {/* Signature Zone */}
-        <SectionHeader title="Signature" />
-        <View style={[st.signatureZone, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
-          <View style={[st.signaturePlaceholder, { borderColor: colors.border }]}>
-            <Calendar size={24} color={colors.textMuted} />
-            <Text style={[st.signatureText, { color: colors.textMuted }]}>
-              Zone de signature
-            </Text>
-            <Text style={[st.signatureHint, { color: colors.textMuted }]}>
-              Appuyez pour signer
-            </Text>
+        {/* Confirmation */}
+        <SectionHeader title="Confirmation" />
+        <TouchableOpacity
+          style={[st.signatureZone, { backgroundColor: colors.card, borderColor: confirmed ? colors.primary : colors.borderLight }]}
+          onPress={() => setConfirmed(!confirmed)}
+          activeOpacity={0.7}
+        >
+          <View style={st.confirmRow}>
+            <View style={[st.checkbox, confirmed && { backgroundColor: colors.primary, borderColor: colors.primary }]}>
+              {confirmed && <CheckCircle size={16} color="#fff" />}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[st.signatureText, { color: colors.text }]}>
+                Je confirme l'exactitude de cet encaissement
+              </Text>
+              <Text style={[st.signatureHint, { color: colors.textMuted }]}>
+                Signature non requise sur mobile
+              </Text>
+            </View>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* Submit Button */}
         <Button
@@ -326,14 +335,19 @@ const st = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.lg,
   },
-  signaturePlaceholder: {
+  confirmRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.smd,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
     borderWidth: 2,
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    height: 120,
+    borderColor: '#ccc',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
   },
   signatureText: {
     fontSize: typography.fontSizes.sm,

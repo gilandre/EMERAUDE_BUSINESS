@@ -1,13 +1,16 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, RefreshControl,
-  TouchableOpacity, TextInput, ActivityIndicator,
+  TouchableOpacity, TextInput, ActivityIndicator, Modal, Alert,
 } from 'react-native';
-import { Search, SlidersHorizontal, Building2, ChevronRight, Plus } from 'lucide-react-native';
+import { Search, SlidersHorizontal, Building2, ChevronRight, Plus, X } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { typography, spacing } from '../theme';
 import { apiFetch } from '../api/client';
 import { Badge } from '../components/Badge';
+import { Skeleton, SkeletonCard } from '../components/Skeleton';
+import { useDebounce } from '../hooks/useDebounce';
+import { formatMontant, formatShort } from '../utils/format';
 
 interface BeneficiaireItem {
   id: string;
@@ -26,11 +29,15 @@ export function BeneficiairesScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterType, setFilterType] = useState<string | null>(null);
+  const debouncedSearch = useDebounce(search, 400);
 
-  const fetchData = useCallback(async (searchQuery = '') => {
+  const fetchData = useCallback(async () => {
     try {
       const params = new URLSearchParams();
-      if (searchQuery.trim()) params.set('search', searchQuery.trim());
+      if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
+      if (filterType) params.set('type', filterType);
       params.set('page', '1');
       params.set('limit', '50');
       const res = await apiFetch<any>(`/api/beneficiaires?${params}`);
@@ -41,20 +48,11 @@ export function BeneficiairesScreen({ navigation }: any) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [debouncedSearch, filterType]);
 
-  useEffect(() => { fetchData(search); }, [fetchData, search]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  const onRefresh = () => { setRefreshing(true); fetchData(search); };
-
-  const fmt = (n: number) =>
-    n.toLocaleString('fr-FR', { maximumFractionDigits: 0 });
-
-  const fmtShort = (n: number) => {
-    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-    if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
-    return String(n);
-  };
+  const onRefresh = () => { setRefreshing(true); fetchData(); };
 
   const totalVolume = items.reduce((s, b) => s + (b.totalPaye || 0), 0);
 
@@ -78,9 +76,9 @@ export function BeneficiairesScreen({ navigation }: any) {
       <View style={styles.cardBottom}>
         <View>
           <Text style={[styles.paidLabel, { color: colors.textMuted }]}>TOTAL PAYÉ À CE JOUR</Text>
-          <Text style={[styles.paidValue, { color: colors.text }]}>{fmt(item.totalPaye)} FCFA</Text>
+          <Text style={[styles.paidValue, { color: colors.text }]}>{formatMontant(item.totalPaye)}</Text>
         </View>
-        <TouchableOpacity style={[styles.payBtn, { backgroundColor: colors.primary }]}>
+        <TouchableOpacity style={[styles.payBtn, { backgroundColor: colors.primary }]} onPress={() => navigation.navigate('NouveauDecaissement', { beneficiaireId: item.id, beneficiaireNom: item.nom })}>
           <Text style={styles.payBtnText}>Payer</Text>
         </TouchableOpacity>
       </View>
@@ -89,8 +87,20 @@ export function BeneficiairesScreen({ navigation }: any) {
 
   if (loading) {
     return (
-      <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={[styles.container, { backgroundColor: colors.background, padding: spacing.md }]}>
+        <Skeleton height={44} borderRadius={12} style={{ marginBottom: spacing.md }} />
+        {[1, 2, 3, 4, 5].map((i) => (
+          <SkeletonCard key={i} style={{ marginBottom: spacing.sm }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Skeleton width={44} height={44} borderRadius={12} />
+              <View style={{ flex: 1, gap: 6 }}>
+                <Skeleton width="60%" height={16} />
+                <Skeleton width="40%" height={12} />
+              </View>
+              <Skeleton width={50} height={28} borderRadius={14} />
+            </View>
+          </SkeletonCard>
+        ))}
       </View>
     );
   }
@@ -115,8 +125,8 @@ export function BeneficiairesScreen({ navigation }: any) {
             onChangeText={setSearch}
           />
         </View>
-        <TouchableOpacity style={[styles.filterBtn, { backgroundColor: colors.card }]}>
-          <SlidersHorizontal size={18} color={colors.textMuted} />
+        <TouchableOpacity style={[styles.filterBtn, { backgroundColor: filterType ? colors.primary : colors.card }]} onPress={() => setShowFilters(true)}>
+          <SlidersHorizontal size={18} color={filterType ? '#fff' : colors.textMuted} />
         </TouchableOpacity>
       </View>
 
@@ -128,7 +138,7 @@ export function BeneficiairesScreen({ navigation }: any) {
         </View>
         <View style={[styles.statChip, { backgroundColor: colors.card }]}>
           <Text style={[styles.statLabel, { color: colors.textSecondary }]}>VOLUME MENSUEL</Text>
-          <Text style={[styles.statValue, { color: colors.text }]}>{fmtShort(totalVolume)} FCFA</Text>
+          <Text style={[styles.statValue, { color: colors.text }]}>{formatShort(totalVolume)} FCFA</Text>
         </View>
       </View>
 
@@ -149,9 +159,46 @@ export function BeneficiairesScreen({ navigation }: any) {
       />
 
       {/* FAB */}
-      <TouchableOpacity style={[styles.fab, { backgroundColor: colors.primary }]}>
+      <TouchableOpacity style={[styles.fab, { backgroundColor: colors.primary }]} onPress={() => Alert.alert('Nouveau bénéficiaire', 'La création de bénéficiaires sera disponible prochainement. Utilisez le portail web pour créer un bénéficiaire.')}>
         <Plus size={24} color="#fff" />
       </TouchableOpacity>
+
+      {/* Filter Modal */}
+      <Modal visible={showFilters} transparent animationType="slide" onRequestClose={() => setShowFilters(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Filtres</Text>
+              <TouchableOpacity onPress={() => setShowFilters(false)}>
+                <X size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.filterLabel, { color: colors.textMuted }]}>TYPE</Text>
+            {[
+              { value: null, label: 'Tous' },
+              { value: 'ENTREPRISE', label: 'Entreprise' },
+              { value: 'PARTICULIER', label: 'Particulier' },
+            ].map((opt) => (
+              <TouchableOpacity
+                key={opt.label}
+                style={[styles.filterOption, filterType === opt.value && { backgroundColor: 'rgba(16,183,127,0.1)', borderWidth: 1, borderColor: colors.primary }]}
+                onPress={() => { setFilterType(opt.value); setShowFilters(false); }}
+              >
+                <Text style={[styles.filterOptionText, { color: filterType === opt.value ? colors.primary : colors.text }]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+
+            {filterType && (
+              <TouchableOpacity style={styles.filterReset} onPress={() => { setFilterType(null); setShowFilters(false); }}>
+                <Text style={styles.filterResetText}>Réinitialiser</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -293,5 +340,53 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.xxl,
     fontSize: typography.fontSizes.sm,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  modalTitle: {
+    fontSize: typography.fontSizes.xl,
+    fontFamily: typography.fontFamily.bold,
+    fontWeight: '700',
+  },
+  filterLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginBottom: spacing.sm,
+  },
+  filterOption: {
+    paddingVertical: spacing.smd,
+    paddingHorizontal: spacing.md,
+    borderRadius: 12,
+    marginBottom: spacing.xs,
+  },
+  filterOptionText: {
+    fontSize: typography.fontSizes.sm,
+    fontFamily: typography.fontFamily.medium,
+  },
+  filterReset: {
+    paddingVertical: spacing.smd,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  filterResetText: {
+    fontSize: typography.fontSizes.sm,
+    fontFamily: typography.fontFamily.medium,
+    color: '#ef4444',
   },
 });

@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
         nom: true,
         prenom: true,
         active: true,
+        mobileAccess: true,
         lastLoginAt: true,
         createdAt: true,
         profilId: true,
@@ -106,6 +107,7 @@ export async function POST(request: NextRequest) {
       prenom: parsed.data.prenom ?? null,
       name: parsed.data.nom || parsed.data.prenom ? `${parsed.data.prenom ?? ""} ${parsed.data.nom ?? ""}`.trim() : null,
       profilId: parsed.data.profilId ?? null,
+      mobileAccess: parsed.data.mobileAccess ?? false,
     },
     select: {
       id: true,
@@ -114,6 +116,7 @@ export async function POST(request: NextRequest) {
       nom: true,
       prenom: true,
       active: true,
+      mobileAccess: true,
       profilId: true,
       profil: { select: { code: true, libelle: true } },
       createdAt: true,

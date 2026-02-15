@@ -6,6 +6,7 @@ export const createUserSchema = z.object({
   nom: z.string().optional(),
   prenom: z.string().optional(),
   profilId: z.string().optional(),
+  mobileAccess: z.boolean().optional(),
 });
 
 export const updateUserSchema = z.object({
@@ -14,6 +15,7 @@ export const updateUserSchema = z.object({
   prenom: z.string().optional(),
   profilId: z.string().nullable().optional(),
   active: z.boolean().optional(),
+  mobileAccess: z.boolean().optional(),
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;

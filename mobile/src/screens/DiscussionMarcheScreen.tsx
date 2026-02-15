@@ -307,7 +307,18 @@ export function DiscussionMarcheScreen() {
 
       {/* Input Bar */}
       <View style={[st.inputBar, { backgroundColor: colors.card, borderTopColor: colors.borderLight }]}>
-        <TouchableOpacity style={st.attachBtn}>
+        <TouchableOpacity style={st.attachBtn} onPress={async () => {
+          try {
+            const DocumentPicker = require('expo-document-picker');
+            const result = await DocumentPicker.getDocumentAsync({ type: '*/*' });
+            if (!result.canceled && result.assets?.[0]) {
+              const file = result.assets[0];
+              Alert.alert('Pièce jointe', `Fichier sélectionné : ${file.name}\n\nL'envoi de pièces jointes sera disponible prochainement.`);
+            }
+          } catch {
+            Alert.alert('Erreur', 'Impossible de sélectionner un fichier');
+          }
+        }}>
           <Paperclip size={22} color={colors.textMuted} />
         </TouchableOpacity>
         <View style={[st.inputWrapper, { backgroundColor: isDark ? colors.surface : colors.borderLight }]}>

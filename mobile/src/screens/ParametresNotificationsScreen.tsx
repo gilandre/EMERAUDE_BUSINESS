@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import { useTheme } from '../context/ThemeContext';
 import { typography, spacing } from '../theme';
 import { Button } from '../components/Button';
 import { SectionHeader } from '../components/SectionHeader';
+import { apiFetch } from '../api/client';
 
 export function ParametresNotificationsScreen() {
   const { colors, isDark } = useTheme();
@@ -35,8 +36,51 @@ export function ParametresNotificationsScreen() {
     '{{reference}} - {{statut}} ({{montant}} FCFA)'
   );
 
-  const handleSave = () => {
-    Alert.alert('Succès', 'Réglages de notifications enregistrés');
+  const [saving, setSaving] = useState(false);
+
+  const loadPreferences = useCallback(async () => {
+    try {
+      const prefs = await apiFetch<any>('/api/users/me/preferences');
+      if (prefs.notifications) {
+        const n = prefs.notifications;
+        if (n.approvedAlert !== undefined) setApprovedAlert(n.approvedAlert);
+        if (n.rejectedAlert !== undefined) setRejectedAlert(n.rejectedAlert);
+        if (n.infoNeededAlert !== undefined) setInfoNeededAlert(n.infoNeededAlert);
+        if (n.emailSubject) setEmailSubject(n.emailSubject);
+        if (n.emailBody) setEmailBody(n.emailBody);
+        if (n.pushTitle) setPushTitle(n.pushTitle);
+        if (n.pushBody) setPushBody(n.pushBody);
+      }
+    } catch {
+      // Use defaults
+    }
+  }, []);
+
+  useEffect(() => { loadPreferences(); }, [loadPreferences]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await apiFetch('/api/users/me/preferences', {
+        method: 'PUT',
+        body: JSON.stringify({
+          notifications: {
+            approvedAlert,
+            rejectedAlert,
+            infoNeededAlert,
+            emailSubject,
+            emailBody,
+            pushTitle,
+            pushBody,
+          },
+        }),
+      });
+      Alert.alert('Succès', 'Réglages de notifications enregistrés');
+    } catch {
+      Alert.alert('Erreur', 'Impossible de sauvegarder les réglages');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const alertTypes = [
@@ -197,9 +241,11 @@ export function ParametresNotificationsScreen() {
       <Button
         title="Enregistrer les réglages"
         onPress={handleSave}
+        loading={saving}
+        disabled={saving}
         size="lg"
         style={st.submitBtn}
-        icon={<CheckCircle size={18} color="#fff" />}
+        icon={!saving ? <CheckCircle size={18} color="#fff" /> : undefined}
       />
 
       <View style={{ height: spacing.xxl }} />

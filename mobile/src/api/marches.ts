@@ -67,6 +67,7 @@ export function createMarche(data: {
   deviseCode?: string;
   dateDebut?: string;
   dateFin?: string;
+  prefinancement?: boolean;
 }): Promise<{ id: string; code: string; libelle: string }> {
   return apiFetch('/api/marches', {
     method: 'POST',

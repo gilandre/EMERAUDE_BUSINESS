@@ -105,6 +105,13 @@ export function LoginScreen() {
       }
 
       if (!res.ok) {
+        if (res.status === 403) {
+          Alert.alert(
+            'Accès non autorisé',
+            data.error || 'Accès mobile non autorisé. Contactez votre administrateur pour activer l\'accès mobile sur votre compte.',
+          );
+          return;
+        }
         throw new Error(data.error || 'Connexion échouée');
       }
 
@@ -251,7 +258,7 @@ export function LoginScreen() {
         {/* Create account link */}
         <View style={styles.createAccountRow}>
           <Text style={styles.createAccountText}>Nouveau ici ? </Text>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => Alert.alert('Création de compte', 'Contactez votre administrateur pour obtenir un accès à l\'application.')}>
             <Text style={styles.createAccountLink}>Créer un compte</Text>
           </TouchableOpacity>
         </View>

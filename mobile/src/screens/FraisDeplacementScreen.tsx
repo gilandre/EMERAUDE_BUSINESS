@@ -7,7 +7,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Modal,
 } from 'react-native';
+import { X } from 'lucide-react-native';
 import { Car, Filter, Bell } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { typography, spacing } from '../theme';
@@ -36,6 +38,7 @@ export function FraisDeplacementScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedContrat, setSelectedContrat] = useState('Tous');
+  const [selectedFrais, setSelectedFrais] = useState<FraisDeplacement | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -186,6 +189,7 @@ export function FraisDeplacementScreen() {
           key={frais.id}
           activeOpacity={0.8}
           style={[st.fraisCard, { backgroundColor: colors.card, borderColor: colors.borderLight }]}
+          onPress={() => setSelectedFrais(frais)}
         >
           <View style={st.fraisTop}>
             <View style={st.fraisInfo}>
@@ -214,6 +218,44 @@ export function FraisDeplacementScreen() {
       )}
 
       <View style={{ height: spacing.xxl }} />
+
+      {/* Detail Modal */}
+      <Modal visible={!!selectedFrais} transparent animationType="slide" onRequestClose={() => setSelectedFrais(null)}>
+        <View style={st.modalOverlay}>
+          <View style={[st.modalContent, { backgroundColor: colors.card }]}>
+            <View style={st.modalHeader}>
+              <Text style={[st.modalTitle, { color: colors.text }]}>Détail du frais</Text>
+              <TouchableOpacity onPress={() => setSelectedFrais(null)}>
+                <X size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            {selectedFrais && (
+              <>
+                <View style={st.modalRow}>
+                  <Text style={[st.modalLabel, { color: colors.textMuted }]}>Libellé</Text>
+                  <Text style={[st.modalValue, { color: colors.text }]}>{selectedFrais.libelle}</Text>
+                </View>
+                <View style={st.modalRow}>
+                  <Text style={[st.modalLabel, { color: colors.textMuted }]}>Montant</Text>
+                  <Text style={[st.modalValue, { color: colors.primary }]}>{formatMontant(selectedFrais.montant)}</Text>
+                </View>
+                <View style={st.modalRow}>
+                  <Text style={[st.modalLabel, { color: colors.textMuted }]}>Date</Text>
+                  <Text style={[st.modalValue, { color: colors.text }]}>{formatDate(selectedFrais.date)}</Text>
+                </View>
+                <View style={st.modalRow}>
+                  <Text style={[st.modalLabel, { color: colors.textMuted }]}>Contrat</Text>
+                  <Text style={[st.modalValue, { color: colors.text }]}>{selectedFrais.contrat}</Text>
+                </View>
+                <View style={st.modalRow}>
+                  <Text style={[st.modalLabel, { color: colors.textMuted }]}>Statut</Text>
+                  <Badge label={selectedFrais.statut} variant={getStatutVariant(selectedFrais.statut)} />
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -333,5 +375,45 @@ const st = StyleSheet.create({
   emptyText: {
     fontSize: typography.fontSizes.sm,
     fontFamily: typography.fontFamily.medium,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  modalTitle: {
+    fontSize: typography.fontSizes.xl,
+    fontFamily: typography.fontFamily.bold,
+    fontWeight: '700',
+  },
+  modalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.smd,
+  },
+  modalLabel: {
+    fontSize: typography.fontSizes.sm,
+    fontFamily: typography.fontFamily.medium,
+  },
+  modalValue: {
+    fontSize: typography.fontSizes.sm,
+    fontFamily: typography.fontFamily.semibold,
+    fontWeight: '600',
+    textAlign: 'right',
+    flex: 1,
+    marginLeft: spacing.md,
   },
 });

@@ -86,6 +86,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check mobile access permission
+    if (!user.mobileAccess) {
+      return NextResponse.json(
+        { error: "Accès mobile non autorisé. Contactez votre administrateur." },
+        { status: 403 }
+      );
+    }
+
     await prisma.user.update({
       where: { id: user.id },
       data: { failedLoginAttempts: 0, lockedUntil: null, lastLoginAt: now },

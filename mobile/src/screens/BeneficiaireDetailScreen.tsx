@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { useRoute, RouteProp } from '@react-navigation/native';
+import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { Building2, CreditCard, ChevronRight } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { typography, spacing } from '../theme';
@@ -41,6 +41,7 @@ interface BeneficiaireDetail {
 
 export function BeneficiaireDetailScreen() {
   const route = useRoute<RouteProp<NavParams, 'BeneficiaireDetail'>>();
+  const navigation = useNavigation<any>();
   const id = route.params?.id ?? '';
   const { colors, isDark } = useTheme();
 
@@ -156,6 +157,7 @@ export function BeneficiaireDetailScreen() {
             key={tx.id}
             activeOpacity={0.8}
             style={[st.txCard, { backgroundColor: colors.card, borderColor: colors.borderLight }]}
+            onPress={() => navigation.navigate('DecaissementDetail', { id: tx.id })}
           >
             <View style={st.txLeft}>
               <Text style={[st.txLibelle, { color: colors.text }]}>{tx.libelle}</Text>
@@ -179,7 +181,7 @@ export function BeneficiaireDetailScreen() {
       {/* Action Button */}
       <Button
         title="Nouveau Paiement"
-        onPress={() => {}}
+        onPress={() => navigation.navigate('NouveauDecaissement', { beneficiaireId: id, beneficiaireNom: nom })}
         size="lg"
         style={st.actionBtn}
         icon={<CreditCard size={18} color="#fff" />}

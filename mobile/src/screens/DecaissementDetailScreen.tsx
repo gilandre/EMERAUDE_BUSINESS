@@ -90,14 +90,30 @@ export function DecaissementDetailScreen() {
 
   const onRefresh = () => { setRefreshing(true); fetchData(); };
 
-  const handleDownload = async (justifId: string) => {
+  const handleDownload = async (justifId: string, nom: string) => {
     try {
       const token = await getToken();
-      const url = `${API_BASE}/api/justificatifs/${justifId}`;
-      // In a real app, use Linking or FileSystem to download
-      Alert.alert('Téléchargement', `Le document sera téléchargé depuis :\n${url}`);
+      const url = `${API_BASE}/api/justificatifs/${justifId}/download`;
+      const FileSystem = require('expo-file-system');
+      const Sharing = require('expo-sharing');
+
+      const fileUri = `${FileSystem.documentDirectory}${nom}`;
+      const downloadResult = await FileSystem.downloadAsync(url, fileUri, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (downloadResult.status === 200) {
+        const isAvailable = await Sharing.isAvailableAsync();
+        if (isAvailable) {
+          await Sharing.shareAsync(downloadResult.uri);
+        } else {
+          Alert.alert('Succès', `Fichier téléchargé : ${nom}`);
+        }
+      } else {
+        Alert.alert('Erreur', 'Le téléchargement a échoué');
+      }
     } catch {
-      Alert.alert('Erreur', 'Impossible de télécharger le document');
+      Alert.alert('Erreur', 'Impossible de télécharger le document. Vérifiez votre connexion.');
     }
   };
 
@@ -214,7 +230,7 @@ export function DecaissementDetailScreen() {
             </Text>
           </View>
           <View style={st.justifActions}>
-            <TouchableOpacity style={st.justifActionBtn} onPress={() => handleDownload(j.id)}>
+            <TouchableOpacity style={st.justifActionBtn} onPress={() => handleDownload(j.id, j.nom)}>
               <Download size={18} color={colors.primary} />
             </TouchableOpacity>
             <TouchableOpacity style={st.justifActionBtn} onPress={() => handleDeleteJustificatif(j.id)}>

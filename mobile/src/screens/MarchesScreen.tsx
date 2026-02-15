@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   RefreshControl,
   TouchableOpacity,
   TextInput,
+  Modal,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import {
@@ -16,14 +17,18 @@ import {
   Wallet,
   CheckCircle,
   Archive,
+  X,
 } from 'lucide-react-native';
 import { Card } from '../components/Card';
 import { Badge } from '../components/Badge';
 import { ProgressBar } from '../components/ProgressBar';
 import { FAB } from '../components/FAB';
 import { SectionHeader } from '../components/SectionHeader';
+import { Skeleton, SkeletonCard } from '../components/Skeleton';
 import { colors, typography, spacing } from '../theme';
 import { apiFetch } from '../api/client';
+import { useDebounce } from '../hooks/useDebounce';
+import { formatMontant } from '../utils/format';
 
 interface MarcheItem {
   id: string;
@@ -51,15 +56,20 @@ export function MarchesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterStatut, setFilterStatut] = useState<string | null>(null);
+  const [filterSort, setFilterSort] = useState<'updatedAt' | 'montant'>('updatedAt');
+  const debouncedSearch = useDebounce(search, 400);
 
-  const load = async (pageNum = 1) => {
+  const load = useCallback(async (pageNum = 1) => {
     try {
       const params = new URLSearchParams();
       params.set('page', String(pageNum));
       params.set('pageSize', '20');
-      params.set('sortBy', 'updatedAt');
+      params.set('sortBy', filterSort);
       params.set('sortOrder', 'desc');
-      if (search.trim()) params.set('q', search.trim());
+      if (debouncedSearch.trim()) params.set('q', debouncedSearch.trim());
+      if (filterStatut) params.set('statut', filterStatut);
 
       const res = await apiFetch<MarchesResponse>(`/api/marches?${params}`);
       setData(res);
@@ -69,20 +79,15 @@ export function MarchesScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [debouncedSearch, filterStatut, filterSort]);
 
   useEffect(() => {
     load(1);
-  }, [search]);
+  }, [load]);
 
   const onRefresh = () => {
     setRefreshing(true);
     load(1);
-  };
-
-  const formatMontant = (n: number, devise = 'XOF') => {
-    const fmt = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(n);
-    return `${fmt} ${devise === 'XOF' ? 'FCFA' : devise}`;
   };
 
   const getStatutVariant = (s: string) => {
@@ -93,8 +98,21 @@ export function MarchesScreen() {
 
   if (loading && !data) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.loadingText}>Chargement...</Text>
+      <View style={[styles.container, { backgroundColor: colors.background, padding: spacing.md }]}>
+        {/* Skeleton search bar */}
+        <Skeleton height={44} borderRadius={12} style={{ marginBottom: spacing.md }} />
+        {/* Skeleton cards */}
+        {[1, 2, 3, 4].map((i) => (
+          <SkeletonCard key={i} style={{ marginBottom: spacing.sm }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Skeleton width={80} height={12} />
+              <Skeleton width={50} height={20} borderRadius={10} />
+            </View>
+            <Skeleton width="70%" height={16} />
+            <Skeleton width={120} height={14} />
+            <Skeleton height={6} borderRadius={3} />
+          </SkeletonCard>
+        ))}
       </View>
     );
   }
@@ -144,8 +162,8 @@ export function MarchesScreen() {
               onChangeText={setSearch}
             />
           </View>
-          <TouchableOpacity style={styles.filterBtn} activeOpacity={0.7}>
-            <SlidersHorizontal size={20} color={colors.textSecondary} />
+          <TouchableOpacity style={[styles.filterBtn, filterStatut ? styles.filterBtnActive : undefined]} activeOpacity={0.7} onPress={() => setShowFilters(true)}>
+            <SlidersHorizontal size={20} color={filterStatut ? '#fff' : colors.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -204,6 +222,70 @@ export function MarchesScreen() {
       </ScrollView>
 
       <FAB onPress={() => navigation.navigate('CreateMarche')} />
+
+      {/* Filter Modal */}
+      <Modal visible={showFilters} transparent animationType="slide" onRequestClose={() => setShowFilters(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Filtres</Text>
+              <TouchableOpacity onPress={() => setShowFilters(false)}>
+                <X size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.filterSectionTitle}>Statut</Text>
+            {[
+              { value: null, label: 'Tous' },
+              { value: 'actif', label: 'Actif' },
+              { value: 'termine', label: 'Terminé' },
+              { value: 'suspendu', label: 'Suspendu' },
+            ].map((opt) => (
+              <TouchableOpacity
+                key={opt.label}
+                style={[styles.filterOption, filterStatut === opt.value && styles.filterOptionActive]}
+                onPress={() => setFilterStatut(opt.value)}
+              >
+                <Text style={[styles.filterOptionText, filterStatut === opt.value && styles.filterOptionTextActive]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+
+            <Text style={[styles.filterSectionTitle, { marginTop: spacing.md }]}>Trier par</Text>
+            {[
+              { value: 'updatedAt' as const, label: 'Date de mise à jour' },
+              { value: 'montant' as const, label: 'Montant' },
+            ].map((opt) => (
+              <TouchableOpacity
+                key={opt.value}
+                style={[styles.filterOption, filterSort === opt.value && styles.filterOptionActive]}
+                onPress={() => setFilterSort(opt.value)}
+              >
+                <Text style={[styles.filterOptionText, filterSort === opt.value && styles.filterOptionTextActive]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+
+            <TouchableOpacity
+              style={styles.filterApplyBtn}
+              onPress={() => setShowFilters(false)}
+            >
+              <Text style={styles.filterApplyText}>Appliquer</Text>
+            </TouchableOpacity>
+
+            {filterStatut && (
+              <TouchableOpacity
+                style={styles.filterResetBtn}
+                onPress={() => { setFilterStatut(null); setFilterSort('updatedAt'); setShowFilters(false); }}
+              >
+                <Text style={styles.filterResetText}>Réinitialiser</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -331,5 +413,90 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: spacing.xs,
     fontStyle: 'italic',
+  },
+
+  // Filter button active
+  filterBtnActive: {
+    backgroundColor: colors.primary,
+  },
+
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  modalTitle: {
+    fontSize: typography.fontSizes.xl,
+    fontFamily: typography.fontFamily.bold,
+    fontWeight: typography.fontWeights.bold as '700',
+    color: colors.text,
+  },
+  filterSectionTitle: {
+    fontSize: typography.fontSizes.xs,
+    fontFamily: typography.fontFamily.semibold,
+    fontWeight: typography.fontWeights.semibold as '600',
+    color: colors.textMuted,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: spacing.sm,
+  },
+  filterOption: {
+    paddingVertical: spacing.smd,
+    paddingHorizontal: spacing.md,
+    borderRadius: 12,
+    marginBottom: spacing.xs,
+    backgroundColor: colors.borderLight,
+  },
+  filterOptionActive: {
+    backgroundColor: colors.primaryTint,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  filterOptionText: {
+    fontSize: typography.fontSizes.sm,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.text,
+  },
+  filterOptionTextActive: {
+    color: colors.primary,
+    fontFamily: typography.fontFamily.semibold,
+    fontWeight: typography.fontWeights.semibold as '600',
+  },
+  filterApplyBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: 16,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    marginTop: spacing.lg,
+  },
+  filterApplyText: {
+    fontSize: typography.fontSizes.base,
+    fontFamily: typography.fontFamily.semibold,
+    fontWeight: typography.fontWeights.semibold as '600',
+    color: '#fff',
+  },
+  filterResetBtn: {
+    paddingVertical: spacing.smd,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  filterResetText: {
+    fontSize: typography.fontSizes.sm,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.error,
   },
 });

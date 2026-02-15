@@ -4,20 +4,17 @@ import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { loginSchema, type LoginInput } from "@/validations/login.schema";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
-  const registered = searchParams.get("registered") === "1";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof LoginInput, string>>>({});
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
@@ -48,7 +45,11 @@ function LoginForm() {
       });
 
       if (res?.error) {
-        setServerError(res.error === "CredentialsSignin" ? "Email ou mot de passe incorrect." : res.error);
+        setServerError(
+          res.error === "CredentialsSignin"
+            ? "Email ou mot de passe incorrect."
+            : res.error
+        );
         setLoading(false);
         return;
       }
@@ -62,98 +63,132 @@ function LoginForm() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold">Emeraude Business</CardTitle>
-          <CardDescription>Connexion à votre espace</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {registered && (
-              <p className="rounded-md bg-green-500/10 p-3 text-sm text-green-700 dark:text-green-400">
-                Compte créé. Connectez-vous avec vos identifiants.
-              </p>
-            )}
-            {serverError && (
-              <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-                {serverError}
-              </p>
-            )}
+    <>
+      <h2 className="text-2xl font-bold text-neutral-medium">Connexion</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Accédez à votre espace de gestion
+      </p>
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="vous@exemple.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoComplete="email"
-                className={errors.email ? "border-destructive" : ""}
-              />
-              {errors.email && (
-                <p className="text-sm text-destructive">{errors.email}</p>
-              )}
-            </div>
+      <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+        {serverError && (
+          <div className="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+            <span className="material-icons text-base">error_outline</span>
+            {serverError}
+          </div>
+        )}
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Mot de passe</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                className={errors.password ? "border-destructive" : ""}
-              />
-              {errors.password && (
-                <p className="text-sm text-destructive">{errors.password}</p>
-              )}
-            </div>
+        {/* Email */}
+        <div className="space-y-1.5">
+          <label
+            htmlFor="email"
+            className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+          >
+            Adresse email
+          </label>
+          <div className="relative">
+            <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-xl text-muted-foreground">
+              alternate_email
+            </span>
+            <input
+              id="email"
+              type="email"
+              placeholder="vous@exemple.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              className={`w-full rounded-lg border bg-background py-3 pl-12 pr-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 ${
+                errors.email ? "border-destructive" : "border-input"
+              }`}
+            />
+          </div>
+          {errors.email && (
+            <p className="text-sm text-destructive">{errors.email}</p>
+          )}
+        </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Connexion..." : "Se connecter"}
-            </Button>
-          </form>
+        {/* Password */}
+        <div className="space-y-1.5">
+          <label
+            htmlFor="password"
+            className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+          >
+            Mot de passe
+          </label>
+          <div className="relative">
+            <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-xl text-muted-foreground">
+              lock_outline
+            </span>
+            <input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              className={`w-full rounded-lg border bg-background py-3 pl-12 pr-12 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 ${
+                errors.password ? "border-destructive" : "border-input"
+              }`}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              tabIndex={-1}
+            >
+              <span className="material-icons text-xl">
+                {showPassword ? "visibility_off" : "visibility"}
+              </span>
+            </button>
+          </div>
+          {errors.password && (
+            <p className="text-sm text-destructive">{errors.password}</p>
+          )}
+        </div>
 
-          <p className="mt-2 text-center text-sm text-muted-foreground">
-            <Link href="/forgot-password" className="underline hover:text-foreground">
-              Mot de passe oublié
-            </Link>
-          </p>
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            Pas encore de compte ?{" "}
-            <Link href="/register" className="underline hover:text-foreground">
-              S&apos;inscrire
-            </Link>
-          </p>
-          <p className="mt-2 text-center text-sm text-muted-foreground">
-            <Link href="/" className="underline hover:text-foreground">
-              Retour à l&apos;accueil
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
-    </main>
+        {/* Remember me + Forgot password */}
+        <div className="flex items-center justify-between">
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="h-4 w-4 rounded border-input accent-primary"
+            />
+            Se souvenir de moi
+          </label>
+          <Link
+            href="/forgot-password"
+            className="text-sm font-medium text-primary hover:text-primary/80"
+          >
+            Mot de passe oublié ?
+          </Link>
+        </div>
+
+        {/* Submit */}
+        <button
+          type="submit"
+          disabled={loading}
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-4 font-semibold text-white shadow-lg shadow-primary/20 transition hover:bg-primary/90 disabled:opacity-50"
+        >
+          {loading ? "Connexion..." : "Se connecter"}
+          {!loading && (
+            <span className="material-icons text-xl">arrow_forward</span>
+          )}
+        </button>
+      </form>
+    </>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <main className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="space-y-1 text-center">
-            <CardTitle className="text-2xl font-bold">Emeraude Business</CardTitle>
-            <CardDescription>Chargement...</CardDescription>
-          </CardHeader>
-          <CardContent className="flex justify-center py-8">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          </CardContent>
-        </Card>
-      </main>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex flex-col items-center justify-center py-12">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="mt-4 text-sm text-muted-foreground">Chargement...</p>
+        </div>
+      }
+    >
       <LoginForm />
     </Suspense>
   );

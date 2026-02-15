@@ -27,6 +27,11 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        "neutral-soft": "#e8efeb",
+        "neutral-medium": "#4a5a54",
+      },
+      fontFamily: {
+        display: ["Inter", "sans-serif"],
       },
     },
   },

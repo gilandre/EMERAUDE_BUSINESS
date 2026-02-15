@@ -34,6 +34,7 @@ model User {
   backupCodes   String[]  @map("backup_codes") // hashed
   failedLoginAttempts Int @default(0) @map("failed_login_attempts")
   lockedUntil   DateTime? @map("locked_until")
+  mustChangePassword Boolean @default(false) @map("must_change_password")
   mobileAccess  Boolean   @default(false) @map("mobile_access")
   preferences   Json?     @default("{}")
   createdAt     DateTime  @default(now()) @map("created_at")

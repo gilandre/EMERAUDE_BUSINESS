@@ -115,7 +115,7 @@ jobs:
               echo "  -> Waiting for $svc to be ready..."
               for i in $(seq 1 20); do
                 sleep 5
-                HEALTH=$(docker compose exec -T "$svc" wget -qO- http://localhost:3000/api/health 2>/dev/null) && {
+                HEALTH=$(docker compose exec -T "$svc" node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>r.text()).then(t=>{console.log(t);process.exit(0)}).catch(()=>process.exit(1))" 2>/dev/null) && {
                   echo "  -> $svc responded: $HEALTH"
                   break
                 }

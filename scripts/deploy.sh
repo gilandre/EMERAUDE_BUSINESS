@@ -27,16 +27,22 @@ docker run --rm --network emeraude_business_backend \
 echo "==> Rolling restart of app instances..."
 for svc in app1 app2 app3; do
   echo "  -> Restarting ${svc}..."
-  docker compose up -d --no-deps "$svc"
-  sleep 15
+  docker compose up -d --no-deps --force-recreate "$svc"
 
-  echo "  -> Health check ${svc}..."
-  if docker compose exec -T "$svc" wget -qO- http://localhost:3000/api/health | grep -q '"status":"healthy"'; then
-    echo "  -> ${svc} is healthy"
-  else
-    echo "  !! ${svc} health check FAILED"
-    exit 1
-  fi
+  echo "  -> Waiting for ${svc} to be ready..."
+  for i in $(seq 1 12); do
+    sleep 10
+    if docker compose exec -T "$svc" wget -qO- http://localhost:3000/api/health 2>/dev/null | grep -q '"status":"healthy"'; then
+      echo "  -> ${svc} is healthy (attempt $i)"
+      break
+    fi
+    if [ "$i" -eq 12 ]; then
+      echo "  !! ${svc} health check FAILED after 120s"
+      docker compose logs --tail=30 "$svc"
+      exit 1
+    fi
+    echo "  -> ${svc} not ready yet (attempt $i/12)..."
+  done
 done
 
 echo "==> Reloading nginx..."

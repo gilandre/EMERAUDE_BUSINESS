@@ -13,15 +13,17 @@ export type RateLimitConfig = {
 };
 
 const CONFIGS: Record<string, RateLimitConfig> = {
-  "api/auth": { windowMs: 15 * 60 * 1000, max: 5 },
-  "api/auth/session": { windowMs: 15 * 60 * 1000, max: 120 },
+  "api/auth": { windowMs: 15 * 60 * 1000, max: 15 },
   "api/alertes/trigger": { windowMs: 60 * 1000, max: 10 },
   "api/alertes/test": { windowMs: 60 * 1000, max: 10 },
   "api/default": { windowMs: 15 * 60 * 1000, max: 100 },
 };
 
-function getConfig(pathname: string): RateLimitConfig {
-  if (pathname === "/api/auth/session") return CONFIGS["api/auth/session"];
+// Routes that should not be rate-limited (read-only auth endpoints used by NextAuth internally)
+const RATE_LIMIT_EXEMPT = ["/api/auth/csrf", "/api/auth/providers", "/api/auth/session"];
+
+function getConfig(pathname: string): RateLimitConfig | null {
+  if (RATE_LIMIT_EXEMPT.includes(pathname)) return null;
   if (pathname.startsWith("/api/auth")) return CONFIGS["api/auth"];
   if (pathname.includes("/api/alertes/trigger") || pathname.includes("/api/alertes/test"))
     return CONFIGS["api/alertes/trigger"];
@@ -42,6 +44,7 @@ export async function checkRateLimit(
 ): Promise<{ success: boolean; remaining: number; reset: number }> {
   const path = pathname ?? new URL(request.url).pathname;
   const config = getConfig(path);
+  if (!config) return { success: true, remaining: Infinity, reset: 0 };
   const identifier = getClientIdentifier(request);
   const key = `${PREFIX}${path}:${identifier}`;
 

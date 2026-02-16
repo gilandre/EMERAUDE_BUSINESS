@@ -212,8 +212,12 @@ const nextConfig: NextConfig = {
 
 const config = withPWA(withBundleAnalyzer(nextConfig));
 
-export default withSentryConfig(config, {
-  org: process.env.SENTRY_ORG ?? "",
-  project: process.env.SENTRY_PROJECT ?? "",
-  silent: !process.env.CI,
-});
+const hasSentry = !!(process.env.SENTRY_ORG && process.env.SENTRY_PROJECT && process.env.NEXT_PUBLIC_SENTRY_DSN);
+
+export default hasSentry
+  ? withSentryConfig(config, {
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      silent: !process.env.CI,
+    })
+  : config;

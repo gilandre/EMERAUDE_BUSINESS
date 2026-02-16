@@ -25,11 +25,13 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Identifiants manquants");
         }
 
+        // NextAuth v4 `req.headers` is a plain object, not a Headers instance
         const ipAddress = (() => {
-          const headers = (req as { headers?: Headers })?.headers;
+          const headers = (req as { headers?: Record<string, string> })?.headers;
           if (!headers) return null;
-          const fakeReq = { headers } as Request;
-          return getRequestIp(fakeReq);
+          const forwarded = headers["x-forwarded-for"];
+          if (forwarded) return forwarded.split(",")[0]?.trim() ?? null;
+          return headers["x-real-ip"] ?? null;
         })();
 
         const user = await prisma.user.findUnique({

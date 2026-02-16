@@ -12,12 +12,15 @@ MIGRATOR="ghcr.io/gilandre/emeraude-business-migrator:${TAG}"
 
 cd "$DEPLOY_DIR"
 
+# Source .env to get POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
+set -a && source .env && set +a
+
 echo "==> Pulling images..."
 docker pull "$IMAGE"
 docker pull "$MIGRATOR"
 
 echo "==> Running Prisma migrations..."
-docker run --rm --network emeraude_business_backend --env-file .env \
+docker run --rm --network emeraude_business_backend \
   -e DATABASE_URL="postgresql://${POSTGRES_USER:-emeraude}:${POSTGRES_PASSWORD:-emeraude}@emeraude-postgres:5432/${POSTGRES_DB:-emeraude}" \
   "$MIGRATOR"
 

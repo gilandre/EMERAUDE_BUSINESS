@@ -15,7 +15,7 @@ echo "==> Pulling image ${IMAGE}..."
 docker pull "$IMAGE"
 
 echo "==> Running Prisma migrations..."
-docker compose run --rm app1 npx prisma migrate deploy
+docker compose run --rm app1 node_modules/prisma/build/index.js migrate deploy
 
 echo "==> Rolling restart of app instances..."
 for svc in app1 app2 app3; do

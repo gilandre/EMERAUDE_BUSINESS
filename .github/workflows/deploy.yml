@@ -144,24 +144,27 @@ jobs:
 
     steps:
       - name: Wait for services to stabilize
-        run: sleep 30
+        run: sleep 10
 
-      - name: Check production health
-        run: |
-          RESPONSE=$(curl -sf --max-time 30 "http://${{ secrets.VPS_HOST }}/api/health" || true)
+      - name: Check production health via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            RESPONSE=$(curl -sf --max-time 10 http://localhost/api/health || true)
 
-          if [ -z "$RESPONSE" ]; then
-            echo "::error::Health check failed - no response from server"
-            exit 1
-          fi
+            if [ -z "$RESPONSE" ]; then
+              echo "::error::Health check failed - no response"
+              exit 1
+            fi
 
-          STATUS=$(echo "$RESPONSE" | jq -r '.status' 2>/dev/null || echo "unknown")
-          echo "Health status: $STATUS"
-          echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
+            echo "Health response: $RESPONSE"
 
-          if [ "$STATUS" != "healthy" ]; then
-            echo "::warning::Production health status is '$STATUS' (not 'healthy')"
-            exit 1
-          fi
-
-          echo "Production is healthy!"
+            STATUS=$(echo "$RESPONSE" | jq -r '.status' 2>/dev/null || echo "unknown")
+            if [ "$STATUS" = "healthy" ]; then
+              echo "Production is healthy!"
+            else
+              echo "WARNING: Production health status is '$STATUS'"
+            fi

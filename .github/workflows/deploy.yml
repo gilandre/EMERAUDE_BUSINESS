@@ -1,0 +1,138 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# EMERAUDE BUSINESS - CI/CD Pipeline
+# Build Docker image → Push to GHCR → Deploy to VPS via SSH
+# Triggered on push to main branch
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ghcr.io/gilandre/emeraude-business
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  # ─── Job 1 : Build & Push Docker Image ────────────────────────────────────
+  build:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract short SHA
+        id: sha
+        run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ steps.sha.outputs.short }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ─── Job 2 : Deploy to VPS ────────────────────────────────────────────────
+  deploy:
+    name: Deploy to VPS
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code (for deploy script)
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+
+            DEPLOY_DIR="${{ secrets.VPS_DEPLOY_PATH }}"
+            IMAGE="${{ env.IMAGE_NAME }}:latest"
+
+            cd "$DEPLOY_DIR"
+
+            echo "==> Pulling latest image..."
+            docker pull "$IMAGE"
+
+            echo "==> Running Prisma migrations..."
+            docker compose run --rm app1 npx prisma migrate deploy
+
+            echo "==> Rolling restart app instances..."
+            for svc in app1 app2 app3; do
+              echo "  -> Restarting $svc..."
+              docker compose up -d --no-deps "$svc"
+              sleep 15
+
+              echo "  -> Health check $svc..."
+              docker compose exec -T "$svc" wget -qO- http://localhost:3000/api/health | grep -q '"status":"healthy"' \
+                || { echo "FAIL: $svc health check failed"; exit 1; }
+              echo "  -> $svc is healthy"
+            done
+
+            echo "==> Reloading nginx..."
+            docker compose exec -T nginx nginx -s reload
+
+            echo "==> Cleaning up old images..."
+            docker image prune -f
+
+            echo "==> Deployment complete!"
+
+  # ─── Job 3 : Health Check ─────────────────────────────────────────────────
+  health-check:
+    name: Production Health Check
+    needs: deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Wait for services to stabilize
+        run: sleep 30
+
+      - name: Check production health
+        run: |
+          RESPONSE=$(curl -sf --max-time 30 "http://${{ secrets.VPS_HOST }}/api/health" || true)
+
+          if [ -z "$RESPONSE" ]; then
+            echo "::error::Health check failed - no response from server"
+            exit 1
+          fi
+
+          STATUS=$(echo "$RESPONSE" | jq -r '.status' 2>/dev/null || echo "unknown")
+          echo "Health status: $STATUS"
+          echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
+
+          if [ "$STATUS" != "healthy" ]; then
+            echo "::warning::Production health status is '$STATUS' (not 'healthy')"
+            exit 1
+          fi
+
+          echo "Production is healthy!"

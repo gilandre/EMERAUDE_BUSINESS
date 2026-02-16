@@ -1,5 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import type { ReportQueryConfig } from "./types";
+import {
+  STATUT_DECAISSEMENT_LABELS,
+  STATUT_MARCHE_LABELS,
+  SOURCE_LABELS,
+  ACTION_LABELS,
+  ENTITY_LABELS,
+  label,
+} from "@/lib/labels";
 
 export interface ReportRow {
   [key: string]: unknown;
@@ -51,8 +59,8 @@ async function runFinancierMensuel(_config: ReportQueryConfig): Promise<ReportRo
     }
     for (const [month, vals] of Object.entries(byMonth)) {
       result.push({
-        "Code marché": m.code,
-        "Libellé": m.libelle,
+        Marché: m.libelle,
+        Statut: label(STATUT_MARCHE_LABELS, m.statut),
         Mois: month,
         Encaissements: vals.enc,
         Décaissements: vals.dec,
@@ -68,18 +76,24 @@ async function runTresorerieParMarche(_config: ReportQueryConfig): Promise<Repor
     include: {
       accomptes: { select: { montant: true } },
       decaissements: { select: { montant: true } },
+      prefinancement: { select: { montant: true, montantUtilise: true } },
     },
   });
   return marches.map((m) => {
     const enc = m.accomptes.reduce((s, a) => s + Number(a.montant), 0);
     const dec = m.decaissements.reduce((s, d) => s + Number(d.montant), 0);
+    const prefDispo = m.prefinancement
+      ? Math.max(0, Number(m.prefinancement.montant) - Number(m.prefinancement.montantUtilise))
+      : 0;
     return {
-      Code: m.code,
       Marché: m.libelle,
+      Statut: label(STATUT_MARCHE_LABELS, m.statut),
       "Montant total": Number(m.montantTotal),
       Encaissé: enc,
       Décaissé: dec,
       Trésorerie: enc - dec,
+      "Préfinancement disponible": prefDispo,
+      "Solde total": enc - dec + prefDispo,
     };
   });
 }
@@ -100,17 +114,20 @@ async function runAccomptesDecaissements(config: ReportQueryConfig): Promise<Rep
   const accRows: ReportRow[] = acc.map((a) => ({
     Type: "Encaissement",
     Date: a.dateEncaissement.toISOString().slice(0, 10),
-    Code: a.marche.code,
     Marché: a.marche.libelle,
     Montant: Number(a.montant),
     Référence: a.reference ?? "",
+    Description: a.description ?? "",
   }));
   const decRows: ReportRow[] = dec.map((d) => ({
     Type: "Décaissement",
     Date: d.dateDecaissement.toISOString().slice(0, 10),
-    Code: d.marche.code,
     Marché: d.marche.libelle,
+    Bénéficiaire: d.beneficiaire ?? "",
+    Motif: d.motif ?? "",
     Montant: Number(d.montant),
+    Statut: label(STATUT_DECAISSEMENT_LABELS, d.statut),
+    Source: label(SOURCE_LABELS, d.source),
     Référence: d.reference ?? "",
   }));
   const combined = [...accRows, ...decRows];
@@ -123,11 +140,14 @@ async function runPrefinancements(_config: ReportQueryConfig): Promise<ReportRow
     include: { marche: true },
   });
   return prefs.map((p) => ({
-    Code: p.marche.code,
     Marché: p.marche.libelle,
+    "Statut marché": label(STATUT_MARCHE_LABELS, p.marche.statut),
     "Montant max": Number(p.montant),
     Utilisé: Number(p.montantUtilise),
     Restant: Number(p.montantRestant),
+    "Taux utilisation (%)": Number(p.montant) > 0
+      ? Math.round((Number(p.montantUtilise) / Number(p.montant)) * 100)
+      : 0,
     Actif: p.active ? "Oui" : "Non",
   }));
 }
@@ -157,9 +177,9 @@ async function runAuditUtilisateurs(_config: ReportQueryConfig): Promise<ReportR
   return logs.map((l) => ({
     Date: l.createdAt.toISOString(),
     Utilisateur: l.user?.email ?? "Système",
-    Action: l.action,
-    Entité: l.entity,
-    "ID entité": l.entityId ?? "",
+    Nom: l.user?.nom ?? "",
+    Action: label(ACTION_LABELS, l.action),
+    Entité: label(ENTITY_LABELS, l.entity),
     Description: l.description ?? "",
   }));
 }
@@ -174,13 +194,11 @@ async function runCustomQuery(config: ReportQueryConfig): Promise<ReportRow[]> {
         : undefined,
     });
     return marches.map((m) => ({
-      id: m.id,
-      code: m.code,
-      libelle: m.libelle,
-      montant: Number(m.montantTotal),
-      statut: m.statut,
-      dateDebut: m.dateDebut?.toISOString(),
-      dateFin: m.dateFin?.toISOString(),
+      Marché: m.libelle,
+      "Montant total": Number(m.montantTotal),
+      Statut: label(STATUT_MARCHE_LABELS, m.statut),
+      "Date début": m.dateDebut?.toISOString().slice(0, 10) ?? "",
+      "Date fin": m.dateFin?.toISOString().slice(0, 10) ?? "",
     }));
   }
   return runTresorerieParMarche(config);

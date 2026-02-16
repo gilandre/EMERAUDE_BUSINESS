@@ -131,7 +131,7 @@ export function RegleAlerteListe() {
             <div className="flex flex-wrap gap-2">
               {regle.canaux?.map((c) => (
                 <Badge key={c} variant="outline">
-                  {c}
+                  {c === "email" ? "Email" : c === "sms" ? "SMS" : c === "push" ? "Push" : c === "webhook" ? "Webhook" : c}
                 </Badge>
               ))}
             </div>

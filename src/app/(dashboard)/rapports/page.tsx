@@ -9,6 +9,15 @@ import { ExecutionsList } from "@/components/rapports/ExecutionsList";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 
+const REPORT_TEMPLATES = [
+  { code: "RAPPORT_FINANCIER_MENSUEL", libelle: "Rapport Financier Mensuel", type: "financier" },
+  { code: "RAPPORT_TRESORERIE_PAR_MARCHE", libelle: "Rapport Trésorerie par Marché", type: "trésorerie" },
+  { code: "RAPPORT_ACCOMPTES_DECAIEMENTS", libelle: "Rapport Accomptes/Décaissements", type: "flux" },
+  { code: "RAPPORT_PREFINANCEMENTS", libelle: "Rapport Préfinancements", type: "préfinancement" },
+  { code: "RAPPORT_ALERTES_DECLENCHEES", libelle: "Rapport Alertes Déclenchées", type: "alertes" },
+  { code: "RAPPORT_AUDIT_UTILISATEURS", libelle: "Rapport Audit Utilisateurs", type: "audit" },
+];
+
 async function downloadFile(url: string) {
   const res = await fetch(url);
   if (!res.ok) throw new Error("Erreur lors du téléchargement");
@@ -26,16 +35,7 @@ async function downloadFile(url: string) {
   URL.revokeObjectURL(blobUrl);
 }
 
-const REPORT_TEMPLATES = [
-  { code: "RAPPORT_FINANCIER_MENSUEL", libelle: "Rapport Financier Mensuel", type: "financier" },
-  { code: "RAPPORT_TRESORERIE_PAR_MARCHE", libelle: "Rapport Trésorerie par Marché", type: "trésorerie" },
-  { code: "RAPPORT_ACCOMPTES_DECAIEMENTS", libelle: "Rapport Accomptes/Décaissements", type: "flux" },
-  { code: "RAPPORT_PREFINANCEMENTS", libelle: "Rapport Préfinancements", type: "préfinancement" },
-  { code: "RAPPORT_ALERTES_DECLENCHEES", libelle: "Rapport Alertes Déclenchées", type: "alertes" },
-  { code: "RAPPORT_AUDIT_UTILISATEURS", libelle: "Rapport Audit Utilisateurs", type: "audit" },
-];
-
-export default function AdminRapportsPage() {
+export default function RapportsPage() {
   const queryClient = useQueryClient();
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
 
@@ -117,19 +117,19 @@ export default function AdminRapportsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Générateur de rapports</h1>
+    <div className="space-y-6 p-6">
+      <h1 className="text-2xl font-bold">Rapports</h1>
 
       <Tabs defaultValue="templates">
         <TabsList>
-          <TabsTrigger value="templates">Templates</TabsTrigger>
+          <TabsTrigger value="templates">Générer</TabsTrigger>
           <TabsTrigger value="schedule">Planification</TabsTrigger>
           <TabsTrigger value="history">Historique</TabsTrigger>
         </TabsList>
 
         <TabsContent value="templates" className="space-y-6">
           <div>
-            <h2 className="mb-4 text-lg font-medium">Templates prédéfinis</h2>
+            <h2 className="mb-4 text-lg font-medium">Templates disponibles</h2>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {REPORT_TEMPLATES.map((t) => (
                 <ReportTemplateCard

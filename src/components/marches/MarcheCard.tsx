@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils";
 import { MontantDisplay } from "@/components/devises/MontantDisplay";
 import { ConversionWidget } from "@/components/devises/ConversionWidget";
+import { STATUT_MARCHE_LABELS, label } from "@/lib/labels";
 
 export interface MarcheCardProps {
   id: string;
@@ -42,7 +43,7 @@ export function MarcheCard({
           </Link>
           <p className="text-sm text-muted-foreground">{code}</p>
         </div>
-        <Badge variant={statut === "actif" ? "default" : "secondary"}>{statut}</Badge>
+        <Badge variant={statut === "actif" ? "default" : "secondary"}>{label(STATUT_MARCHE_LABELS, statut)}</Badge>
       </CardHeader>
       <CardContent className="space-y-2">
         <div className="text-2xl font-bold">

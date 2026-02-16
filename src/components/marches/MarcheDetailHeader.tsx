@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Edit, Lock, FileDown, MoreVertical, Trash2 } from "lucide-react";
+import { STATUT_MARCHE_LABELS, label } from "@/lib/labels";
 
 interface MarcheDetailHeaderProps {
   libelle: string;
@@ -51,7 +52,7 @@ export function MarcheDetailHeader({
             </Link>
             <h1 className="text-2xl md:text-3xl font-bold">Marché: {libelle}</h1>
             <Badge variant={statut === "actif" ? "default" : "secondary"}>
-              {statut}
+              {label(STATUT_MARCHE_LABELS, statut)}
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">

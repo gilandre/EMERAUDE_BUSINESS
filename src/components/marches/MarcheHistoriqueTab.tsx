@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate } from "@/lib/utils";
 import { FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ACTION_LABELS as SHARED_ACTION_LABELS, ENTITY_LABELS, label } from "@/lib/labels";
 
 interface MarcheHistoriqueTabProps {
   marcheId: string;
@@ -25,11 +26,7 @@ interface AuditLog {
   userName?: string;
 }
 
-const ACTION_LABELS: Record<string, string> = {
-  CREATE: "Création",
-  UPDATE: "Modification",
-  DELETE: "Suppression",
-};
+const ACTION_LABELS = SHARED_ACTION_LABELS;
 
 export function MarcheHistoriqueTab({ marcheId }: MarcheHistoriqueTabProps) {
   const { data: logs, isLoading, isError, error, refetch } = useQuery<AuditLog[]>({
@@ -50,7 +47,7 @@ export function MarcheHistoriqueTab({ marcheId }: MarcheHistoriqueTabProps) {
       "Date;Action;Entité;Utilisateur;Description",
       ...(logs ?? []).map(
         (l) =>
-          `${l.createdAt};${l.action};${l.entity};${l.userEmail ?? l.user?.email ?? "-"};${(l.description ?? "").replace(/;/g, ",")}`
+          `${l.createdAt};${label(ACTION_LABELS, l.action)};${label(ENTITY_LABELS, l.entity)};${l.userEmail ?? l.user?.email ?? "-"};${(l.description ?? "").replace(/;/g, ",")}`
       ),
     ];
     const blob = new Blob([lines.join("\n")], {
@@ -113,7 +110,7 @@ export function MarcheHistoriqueTab({ marcheId }: MarcheHistoriqueTabProps) {
                         {ACTION_LABELS[log.action] ?? log.action}
                       </span>
                       <span className="text-sm text-muted-foreground">
-                        {log.entity}
+                        {label(ENTITY_LABELS, log.entity)}
                       </span>
                       <span className="text-xs text-muted-foreground">
                         {formatDate(log.createdAt)}

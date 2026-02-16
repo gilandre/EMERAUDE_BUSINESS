@@ -28,6 +28,7 @@ export const config = {
     "/dashboard/:path*",
     "/marches/:path*",
     "/tresorerie/:path*",
+    "/rapports/:path*",
     "/admin/:path*",
     "/profil/:path*",
     "/change-password",

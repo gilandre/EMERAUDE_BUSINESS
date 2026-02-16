@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, PlusCircle, CheckCircle, FileText, Bell, User } from "lucide-react";
+import { ACTION_LABELS, ENTITY_LABELS, label } from "@/lib/labels";
 
 interface LogEntry {
   id: string;
@@ -71,7 +72,7 @@ export function RecentActivityList({ logs }: RecentActivityListProps) {
                   {getIcon(l.action, l.entity)}
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm">
-                      {l.action} · {l.entity}
+                      {label(ACTION_LABELS, l.action)} · {label(ENTITY_LABELS, l.entity)}
                       {l.entityId && (
                         <span className="text-muted-foreground font-normal"> #{l.entityId.slice(-6)}</span>
                       )}

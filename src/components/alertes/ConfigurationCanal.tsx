@@ -71,7 +71,7 @@ export function ConfigurationCanal() {
       {canaux?.map((c) => (
         <Card key={c.canal}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-lg">{c.canal}</CardTitle>
+            <CardTitle className="text-lg">{c.canal === "email" ? "Email" : c.canal === "sms" ? "SMS" : c.canal === "push" ? "Push" : c.canal === "webhook" ? "Webhook" : c.canal}</CardTitle>
             <Badge variant={c.isEnabled ? "default" : "secondary"}>
               {c.isEnabled ? "Activé" : "Désactivé"}
             </Badge>

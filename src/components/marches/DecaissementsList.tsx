@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { DecaissementForm } from "./DecaissementForm";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { STATUT_DECAISSEMENT_LABELS, label } from "@/lib/labels";
 
 export interface DecaissementItem {
   id: string;
@@ -135,7 +136,7 @@ export function DecaissementsList({ marcheId, deviseCode = "XOF", soldeDisponibl
                   </TableCell>
                   <TableCell>
                     <Badge variant={d.statut === "PAYE" ? "default" : d.statut === "VALIDE" ? "secondary" : "outline"}>
-                      {d.statut ?? "VALIDE"}
+                      {label(STATUT_DECAISSEMENT_LABELS, d.statut ?? "VALIDE")}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-red-600 font-medium">

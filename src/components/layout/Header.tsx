@@ -21,7 +21,7 @@ export function Header() {
   const { refresh, loading } = useRefresh();
 
   return (
-    <header className="flex items-center justify-between border-b bg-background px-6 py-4">
+    <header className="flex items-center justify-between border-b border-emerald-100 bg-gradient-to-r from-white to-emerald-50/50 px-6 py-4 dark:border-emerald-900/30 dark:from-background dark:to-emerald-950/20">
       <Breadcrumb />
       <div className="flex items-center gap-4">
         <OnlineIndicator />

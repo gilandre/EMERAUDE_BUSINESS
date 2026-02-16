@@ -17,6 +17,7 @@ import {
 import { formatDate } from "@/lib/utils";
 import { Search, FileDown, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
+import { ACTION_LABELS, ENTITY_LABELS, label } from "@/lib/labels";
 
 export default function AdminAuditPage() {
   const [page, setPage] = useState(1);
@@ -46,15 +47,29 @@ export default function AdminAuditPage() {
     },
   });
 
-  const handleExport = (format: "csv" | "json") => {
+  const handleExport = async (format: "csv" | "json") => {
     const params = new URLSearchParams({ export: format });
     if (filters.userId) params.set("userId", filters.userId);
     if (filters.entity) params.set("entity", filters.entity);
     if (filters.action) params.set("action", filters.action);
     if (filters.from) params.set("from", filters.from);
     if (filters.to) params.set("to", filters.to);
-    window.open(`/api/audit?${params}`, "_blank");
-    toast.success(`Export ${format.toUpperCase()} lancé`);
+    try {
+      const res = await fetch(`/api/audit?${params}`);
+      if (!res.ok) throw new Error("Erreur export");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `audit-${new Date().toISOString().slice(0, 10)}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success(`Export ${format.toUpperCase()} téléchargé`);
+    } catch {
+      toast.error("Erreur lors de l'export");
+    }
   };
 
   const logs = data?.data ?? [];
@@ -92,7 +107,7 @@ export default function AdminAuditPage() {
           <div className="flex flex-wrap gap-4">
             {Object.entries(actionCounts).map(([action, count]) => (
               <div key={action} className="rounded-lg border px-4 py-2">
-                <span className="text-sm text-muted-foreground">{action}</span>
+                <span className="text-sm text-muted-foreground">{label(ACTION_LABELS, action)}</span>
                 <p className="text-xl font-bold">{count}</p>
               </div>
             ))}
@@ -124,10 +139,10 @@ export default function AdminAuditPage() {
                 onChange={(e) => setFilters((p) => ({ ...p, entity: e.target.value }))}
               >
                 <option value="">— Toutes —</option>
-                <option value="Marche">Marche</option>
-                <option value="Accompte">Accompte</option>
-                <option value="Decaissement">Decaissement</option>
-                <option value="User">User</option>
+                <option value="Marche">Marché</option>
+                <option value="Accompte">Encaissement</option>
+                <option value="Decaissement">Décaissement</option>
+                <option value="User">Utilisateur</option>
                 <option value="Profil">Profil</option>
                 <option value="Alerte">Alerte</option>
               </select>
@@ -140,9 +155,9 @@ export default function AdminAuditPage() {
                 onChange={(e) => setFilters((p) => ({ ...p, action: e.target.value }))}
               >
                 <option value="">— Toutes —</option>
-                <option value="CREATE">CREATE</option>
-                <option value="UPDATE">UPDATE</option>
-                <option value="DELETE">DELETE</option>
+                <option value="CREATE">Création</option>
+                <option value="UPDATE">Modification</option>
+                <option value="DELETE">Suppression</option>
               </select>
             </div>
             <div>
@@ -195,8 +210,8 @@ export default function AdminAuditPage() {
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                         {formatDate(log.createdAt)}
                       </TableCell>
-                      <TableCell><span className="font-mono text-xs">{log.action}</span></TableCell>
-                      <TableCell>{log.entity}</TableCell>
+                      <TableCell><span className="text-xs font-medium">{label(ACTION_LABELS, log.action)}</span></TableCell>
+                      <TableCell>{label(ENTITY_LABELS, log.entity)}</TableCell>
                       <TableCell className="text-sm">{(log.user as { email?: string })?.email ?? "—"}</TableCell>
                       <TableCell className="max-w-[300px] truncate text-sm">{log.description ?? "—"}</TableCell>
                     </TableRow>

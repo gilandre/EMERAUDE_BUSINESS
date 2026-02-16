@@ -127,9 +127,9 @@ export function ExecutionHistorique() {
                     {formatDate(ex.createdAt)}
                   </TableCell>
                   <TableCell>
-                    <span className="font-medium">{ex.alerte?.code ?? ex.alerteId}</span>
+                    <span className="font-medium">{ex.alerte?.libelle ?? ex.alerte?.code ?? ex.alerteId}</span>
                   </TableCell>
-                  <TableCell>{ex.canal}</TableCell>
+                  <TableCell>{ex.canal === "email" ? "Email" : ex.canal === "sms" ? "SMS" : ex.canal === "push" ? "Push" : ex.canal === "webhook" ? "Webhook" : ex.canal}</TableCell>
                   <TableCell className="max-w-[200px] truncate">{ex.destinataire}</TableCell>
                   <TableCell>
                     <Badge variant={ex.envoyee ? "default" : "destructive"}>

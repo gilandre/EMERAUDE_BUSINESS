@@ -278,6 +278,20 @@ async function main() {
     },
   });
 
+  await prisma.menu.upsert({
+    where: { code: "RAPPORTS" },
+    update: {},
+    create: {
+      code: "RAPPORTS",
+      libelle: "Rapports",
+      path: "/rapports",
+      icon: "FileText",
+      ordre: 4,
+      active: true,
+      permission: "rapports:read",
+    },
+  });
+
   const menuAdmin = await prisma.menu.upsert({
     where: { code: "ADMIN" },
     update: {},

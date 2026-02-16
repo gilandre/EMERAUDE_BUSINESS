@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { MontantDisplay } from "@/components/devises/MontantDisplay";
 import { MoreHorizontal } from "lucide-react";
+import { DEVISE_LABELS, label } from "@/lib/labels";
 
 interface MarcheRow {
   id: string;
@@ -130,7 +131,7 @@ export function MarchesTable({
                 )}
               </div>
             </TableCell>
-            <TableCell>{m.deviseCode ?? "XOF"}</TableCell>
+            <TableCell>{label(DEVISE_LABELS, m.deviseCode ?? "XOF")}</TableCell>
             <TableCell className="text-right">
               <Link href={`/marches/${m.id}`}>
                 <Button variant="ghost" size="icon">

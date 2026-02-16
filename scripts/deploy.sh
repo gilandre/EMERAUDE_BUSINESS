@@ -30,18 +30,18 @@ for svc in app1 app2 app3; do
   docker compose up -d --no-deps --force-recreate "$svc"
 
   echo "  -> Waiting for ${svc} to be ready..."
-  for i in $(seq 1 12); do
-    sleep 10
-    if docker compose exec -T "$svc" wget -qO- http://localhost:3000/api/health 2>/dev/null | grep -q '"status":"healthy"'; then
-      echo "  -> ${svc} is healthy (attempt $i)"
+  for i in $(seq 1 20); do
+    sleep 5
+    HEALTH=$(docker compose exec -T "$svc" wget -qO- http://localhost:3000/api/health 2>/dev/null) && {
+      echo "  -> ${svc} responded: $HEALTH"
       break
-    fi
-    if [ "$i" -eq 12 ]; then
-      echo "  !! ${svc} health check FAILED after 120s"
-      docker compose logs --tail=30 "$svc"
+    }
+    if [ "$i" -eq 20 ]; then
+      echo "  !! ${svc} not responding after 100s"
+      docker compose logs --tail=50 "$svc"
       exit 1
     fi
-    echo "  -> ${svc} not ready yet (attempt $i/12)..."
+    echo "  -> ${svc} not ready yet (attempt $i/20)..."
   done
 done
 

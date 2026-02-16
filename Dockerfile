@@ -23,6 +23,12 @@ RUN npx prisma generate
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
+# ─── Migrator (pour prisma migrate deploy) ─────────────────────────────────
+FROM base AS migrator
+COPY --from=deps /app/node_modules ./node_modules
+COPY prisma ./prisma
+CMD ["npx", "prisma", "migrate", "deploy"]
+
 # ─── Runner (image finale) ─────────────────────────────────────────────────
 FROM base AS runner
 ENV NODE_ENV=production
@@ -35,9 +41,7 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-# Prisma CLI + schema + migrations pour prisma migrate deploy
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+# Prisma schema + migrations
 COPY --from=builder /app/prisma ./prisma
 
 USER nextjs

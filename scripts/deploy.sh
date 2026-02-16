@@ -8,14 +8,18 @@ set -euo pipefail
 DEPLOY_DIR="${1:?Usage: $0 <deploy-dir> [image-tag]}"
 TAG="${2:-latest}"
 IMAGE="ghcr.io/gilandre/emeraude-business:${TAG}"
+MIGRATOR="ghcr.io/gilandre/emeraude-business-migrator:${TAG}"
 
 cd "$DEPLOY_DIR"
 
-echo "==> Pulling image ${IMAGE}..."
+echo "==> Pulling images..."
 docker pull "$IMAGE"
+docker pull "$MIGRATOR"
 
 echo "==> Running Prisma migrations..."
-docker compose run --rm app1 node_modules/prisma/build/index.js migrate deploy
+docker run --rm --network emeraude_business_backend --env-file .env \
+  -e DATABASE_URL="postgresql://${POSTGRES_USER:-emeraude}:${POSTGRES_PASSWORD:-emeraude}@emeraude-postgres:5432/${POSTGRES_DB:-emeraude}" \
+  "$MIGRATOR"
 
 echo "==> Rolling restart of app instances..."
 for svc in app1 app2 app3; do

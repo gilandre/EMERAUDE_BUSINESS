@@ -45,14 +45,27 @@ jobs:
         id: sha
         run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> "$GITHUB_OUTPUT"
 
-      - name: Build and push Docker image
+      - name: Build and push app image
         uses: docker/build-push-action@v6
         with:
           context: .
+          target: runner
           push: true
           tags: |
             ${{ env.IMAGE_NAME }}:latest
             ${{ env.IMAGE_NAME }}:${{ steps.sha.outputs.short }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push migrator image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: migrator
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}-migrator:latest
+            ${{ env.IMAGE_NAME }}-migrator:${{ steps.sha.outputs.short }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -81,11 +94,16 @@ jobs:
 
             cd "$DEPLOY_DIR"
 
-            echo "==> Pulling latest image..."
+            MIGRATOR="${{ env.IMAGE_NAME }}-migrator:latest"
+
+            echo "==> Pulling latest images..."
             docker pull "$IMAGE"
+            docker pull "$MIGRATOR"
 
             echo "==> Running Prisma migrations..."
-            docker compose run --rm app1 node_modules/prisma/build/index.js migrate deploy
+            docker run --rm --network emeraude_business_backend --env-file .env \
+              -e DATABASE_URL="postgresql://${POSTGRES_USER:-emeraude}:${POSTGRES_PASSWORD:-emeraude}@emeraude-postgres:5432/${POSTGRES_DB:-emeraude}" \
+              "$MIGRATOR"
 
             echo "==> Rolling restart app instances..."
             for svc in app1 app2 app3; do

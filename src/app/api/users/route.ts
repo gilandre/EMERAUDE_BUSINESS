@@ -23,10 +23,21 @@ export async function GET(request: NextRequest) {
   const pageSize = Math.min(50, Math.max(1, parseInt(searchParams.get("pageSize") ?? "20", 10)));
   const search = searchParams.get("search") ?? "";
   const actif = searchParams.get("active");
+  const profilId = searchParams.get("profilId");
+  const mobileAccess = searchParams.get("mobileAccess");
+  const sortBy = searchParams.get("sortBy") ?? "createdAt";
+  const sortOrder = (searchParams.get("sortOrder") ?? "desc") as "asc" | "desc";
 
-  const where: { active?: boolean; OR?: { email?: { contains: string; mode: "insensitive" }; name?: { contains: string; mode: "insensitive" } }[] } = {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const where: any = {};
   if (actif !== null && actif !== undefined && actif !== "") {
     where.active = actif === "true";
+  }
+  if (profilId) {
+    where.profilId = profilId;
+  }
+  if (mobileAccess !== null && mobileAccess !== undefined && mobileAccess !== "") {
+    where.mobileAccess = mobileAccess === "true";
   }
   if (search) {
     where.OR = [
@@ -35,10 +46,22 @@ export async function GET(request: NextRequest) {
     ];
   }
 
+  // Build orderBy
+  const validSortFields = ["email", "nom", "active", "lastLoginAt", "createdAt", "profil"];
+  const safeSortBy = validSortFields.includes(sortBy) ? sortBy : "createdAt";
+  const safeSortOrder = sortOrder === "asc" ? "asc" : "desc";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let orderBy: any;
+  if (safeSortBy === "profil") {
+    orderBy = { profil: { libelle: safeSortOrder } };
+  } else {
+    orderBy = { [safeSortBy]: safeSortOrder };
+  }
+
   const [users, total] = await Promise.all([
     prisma.user.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy,
       skip: (page - 1) * pageSize,
       take: pageSize,
       select: {

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import Link from "next/link";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +24,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Select } from "@/components/ui/select";
 import { formatDate } from "@/lib/utils";
 import {
   Plus,
@@ -33,34 +33,59 @@ import {
   Key,
   UserCheck,
   UserX,
-  LogIn,
   Smartphone,
+  Eye,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { toast } from "sonner";
+import { UsersFiltersDropdown, type UsersFiltersState } from "@/components/users/UsersFiltersDropdown";
+import { UsersExportMenu } from "@/components/users/UsersExportMenu";
+import { UserEditDialog } from "@/components/users/UserEditDialog";
+
+type SortField = "email" | "nom" | "active" | "lastLoginAt" | "createdAt" | "profil";
+
+interface UserRow {
+  id: string;
+  email: string;
+  name?: string | null;
+  nom?: string | null;
+  prenom?: string | null;
+  active: boolean;
+  mobileAccess?: boolean;
+  lastLoginAt?: string | null;
+  profilId?: string | null;
+  profil?: { id: string; code: string; libelle: string } | null;
+}
 
 export default function AdminUtilisateursPage() {
   const queryClient = useQueryClient();
+  const tableRef = useRef<HTMLDivElement>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [sortBy, setSortBy] = useState<SortField>("createdAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [filters, setFilters] = useState<UsersFiltersState>({ profilId: "", active: "", mobileAccess: "" });
+  const [filtersApplied, setFiltersApplied] = useState<UsersFiltersState>({ profilId: "", active: "", mobileAccess: "" });
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingUser, setEditingUser] = useState<UserRow | null>(null);
   const [resetModal, setResetModal] = useState<string | null>(null);
   const [resetPassword, setResetPassword] = useState("");
-  const [form, setForm] = useState({
-    email: "",
-    password: "",
-    nom: "",
-    prenom: "",
-    profilId: "",
-    mobileAccess: false,
-  });
+
+  const buildParams = useCallback(() => {
+    const params = new URLSearchParams({ page: String(page), pageSize: "20", sortBy, sortOrder });
+    if (search) params.set("search", search);
+    if (filtersApplied.profilId) params.set("profilId", filtersApplied.profilId);
+    if (filtersApplied.active) params.set("active", filtersApplied.active);
+    if (filtersApplied.mobileAccess) params.set("mobileAccess", filtersApplied.mobileAccess);
+    return params;
+  }, [page, search, sortBy, sortOrder, filtersApplied]);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ["admin-users", page, search],
+    queryKey: ["admin-users", page, search, sortBy, sortOrder, filtersApplied],
     queryFn: async () => {
-      const params = new URLSearchParams({ page: String(page), pageSize: "20" });
-      if (search) params.set("search", search);
-      const res = await fetch(`/api/users?${params}`);
+      const res = await fetch(`/api/users?${buildParams()}`);
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error ?? "Erreur chargement");
@@ -72,14 +97,14 @@ export default function AdminUtilisateursPage() {
   // Prefetch next page
   useEffect(() => {
     if (data && page < (data.totalPages ?? 1)) {
-      const nextParams = new URLSearchParams({ page: String(page + 1), pageSize: "20" });
-      if (search) nextParams.set("search", search);
+      const nextParams = new URLSearchParams(buildParams());
+      nextParams.set("page", String(page + 1));
       queryClient.prefetchQuery({
-        queryKey: ["admin-users", page + 1, search],
+        queryKey: ["admin-users", page + 1, search, sortBy, sortOrder, filtersApplied],
         queryFn: () => fetch(`/api/users?${nextParams}`).then((r) => r.json()),
       });
     }
-  }, [data, page, search, queryClient]);
+  }, [data, page, search, sortBy, sortOrder, filtersApplied, queryClient, buildParams]);
 
   const { data: profils } = useQuery({
     queryKey: ["profils"],
@@ -89,26 +114,6 @@ export default function AdminUtilisateursPage() {
       const data = await res.json();
       return Array.isArray(data) ? data : [];
     },
-  });
-
-  const createMutation = useMutation({
-    mutationFn: async (payload: { email: string; password: string; nom?: string; prenom?: string; profilId?: string; mobileAccess?: boolean }) => {
-      const res = await fetch("/api/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(d.error ?? "Erreur création");
-      return d;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-      setModalOpen(false);
-      setForm({ email: "", password: "", nom: "", prenom: "", profilId: "", mobileAccess: false });
-      toast.success("Utilisateur créé");
-    },
-    onError: (e: Error) => toast.error(e.message),
   });
 
   const toggleMobileAccessMutation = useMutation({
@@ -125,26 +130,6 @@ export default function AdminUtilisateursPage() {
     onSuccess: (_, { mobileAccess }) => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       toast.success(mobileAccess ? "Accès mobile activé" : "Accès mobile désactivé");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, ...payload }: { id: string; email?: string; nom?: string; prenom?: string; profilId?: string | null; active?: boolean; mobileAccess?: boolean }) => {
-      const res = await fetch(`/api/users/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(d.error ?? "Erreur mise à jour");
-      return d;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-      setModalOpen(false);
-      setEditingId(null);
-      toast.success("Utilisateur mis à jour");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -200,54 +185,31 @@ export default function AdminUtilisateursPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const openEdit = (u: { id: string; email: string; nom?: string | null; prenom?: string | null; profilId?: string | null; mobileAccess?: boolean }) => {
-    setEditingId(u.id);
-    setForm({
-      email: u.email,
-      password: "",
-      nom: u.nom ?? "",
-      prenom: u.prenom ?? "",
-      profilId: u.profilId ?? "",
-      mobileAccess: u.mobileAccess ?? false,
-    });
-    setModalOpen(true);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingId) {
-      updateMutation.mutate({
-        id: editingId,
-        email: form.email,
-        nom: form.nom || undefined,
-        prenom: form.prenom || undefined,
-        profilId: form.profilId || null,
-        mobileAccess: form.mobileAccess,
-      });
+  const handleSort = (field: SortField) => {
+    if (sortBy === field) {
+      setSortOrder((o) => (o === "asc" ? "desc" : "asc"));
     } else {
-      if (!form.password || form.password.length < 8) {
-        toast.error("Mot de passe minimum 8 caractères");
-        return;
-      }
-      createMutation.mutate({
-        email: form.email,
-        password: form.password,
-        nom: form.nom || undefined,
-        prenom: form.prenom || undefined,
-        profilId: form.profilId || undefined,
-        mobileAccess: form.mobileAccess,
-      });
+      setSortBy(field);
+      setSortOrder("asc");
     }
+    setPage(1);
   };
 
-  const users = data?.data ?? [];
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortBy !== field) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
+    return sortOrder === "asc"
+      ? <ArrowUp className="h-3 w-3 ml-1" />
+      : <ArrowDown className="h-3 w-3 ml-1" />;
+  };
+
+  const users: UserRow[] = data?.data ?? [];
   const totalPages = data?.totalPages ?? 1;
 
   return (
     <div className="space-y-6 p-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">Gestion des utilisateurs</h1>
-        <Button onClick={() => { setEditingId(null); setForm({ email: "", password: "", nom: "", prenom: "", profilId: "", mobileAccess: false }); setModalOpen(true); }}>
+        <Button onClick={() => { setEditingUser(null); setModalOpen(true); }}>
           <Plus className="h-4 w-4 mr-2" />
           Nouvel utilisateur
         </Button>
@@ -255,8 +217,8 @@ export default function AdminUtilisateursPage() {
 
       <Card>
         <CardHeader>
-          <div className="flex gap-2">
-            <div className="relative flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Rechercher (email, nom)..."
@@ -265,6 +227,13 @@ export default function AdminUtilisateursPage() {
                 className="pl-9"
               />
             </div>
+            <UsersFiltersDropdown
+              filters={filters}
+              onChange={setFilters}
+              onApply={() => { setFiltersApplied({ ...filters }); setPage(1); }}
+              profils={profils ?? []}
+            />
+            <UsersExportMenu items={users} containerRef={tableRef} />
           </div>
         </CardHeader>
         <CardContent>
@@ -276,21 +245,41 @@ export default function AdminUtilisateursPage() {
               <Button variant="outline" size="sm" onClick={() => refetch()} className="mt-2">Réessayer</Button>
             </div>
           ) : (
-            <>
+            <div ref={tableRef}>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Nom</TableHead>
-                    <TableHead>Profil</TableHead>
-                    <TableHead>Statut</TableHead>
+                    <TableHead>
+                      <button onClick={() => handleSort("email")} className="inline-flex items-center font-medium">
+                        Email <SortIcon field="email" />
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button onClick={() => handleSort("nom")} className="inline-flex items-center font-medium">
+                        Nom <SortIcon field="nom" />
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button onClick={() => handleSort("profil")} className="inline-flex items-center font-medium">
+                        Profil <SortIcon field="profil" />
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button onClick={() => handleSort("active")} className="inline-flex items-center font-medium">
+                        Statut <SortIcon field="active" />
+                      </button>
+                    </TableHead>
                     <TableHead>Mobile</TableHead>
-                    <TableHead>Dernière connexion</TableHead>
+                    <TableHead>
+                      <button onClick={() => handleSort("lastLoginAt")} className="inline-flex items-center font-medium">
+                        Dernière connexion <SortIcon field="lastLoginAt" />
+                      </button>
+                    </TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((u: { id: string; email: string; name?: string | null; nom?: string | null; prenom?: string | null; active: boolean; mobileAccess?: boolean; lastLoginAt?: string | null; profilId?: string | null; profil?: { code: string; libelle: string } | null }) => (
+                  {users.map((u) => (
                     <TableRow key={u.id}>
                       <TableCell className="font-medium">{u.email}</TableCell>
                       <TableCell>{u.name || `${u.prenom ?? ""} ${u.nom ?? ""}`.trim() || "—"}</TableCell>
@@ -319,7 +308,12 @@ export default function AdminUtilisateursPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => openEdit(u)} title="Modifier">
+                          <Link href={`/admin/utilisateurs/${u.id}`}>
+                            <Button variant="ghost" size="sm" title="Voir détail">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                          <Button variant="ghost" size="sm" onClick={() => { setEditingUser(u); setModalOpen(true); }} title="Modifier">
                             <Pencil className="h-4 w-4" />
                           </Button>
                           <Button variant="ghost" size="sm" onClick={() => setResetModal(u.id)} title="Réinitialiser mot de passe">
@@ -363,100 +357,16 @@ export default function AdminUtilisateursPage() {
                   </Button>
                 </div>
               )}
-            </>
+            </div>
           )}
         </CardContent>
       </Card>
 
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent>
-          <form onSubmit={handleSubmit}>
-            <DialogHeader>
-              <DialogTitle>{editingId ? "Modifier l'utilisateur" : "Nouvel utilisateur"}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="email">Email *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-                  required
-                  disabled={!!editingId}
-                />
-              </div>
-              {!editingId && (
-                <div>
-                  <Label htmlFor="password">Mot de passe *</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={form.password}
-                    onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-                    minLength={8}
-                    placeholder="Min. 8 caractères"
-                  />
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="prenom">Prénom</Label>
-                  <Input
-                    id="prenom"
-                    value={form.prenom}
-                    onChange={(e) => setForm((p) => ({ ...p, prenom: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="nom">Nom</Label>
-                  <Input
-                    id="nom"
-                    value={form.nom}
-                    onChange={(e) => setForm((p) => ({ ...p, nom: e.target.value }))}
-                  />
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="profilId">Profil</Label>
-                <Select
-                  id="profilId"
-                  value={form.profilId}
-                  onValueChange={(v) => setForm((p) => ({ ...p, profilId: v }))}
-                  options={[
-                    { value: "", label: "— Aucun —" },
-                    ...(profils ?? []).map((p: { id: string; libelle: string }) => ({
-                      value: p.id,
-                      label: p.libelle,
-                    })),
-                  ]}
-                />
-              </div>
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="mobileAccess"
-                  checked={form.mobileAccess}
-                  onChange={(e) => setForm((p) => ({ ...p, mobileAccess: e.target.checked }))}
-                  className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                />
-                <Label htmlFor="mobileAccess" className="flex items-center gap-2 cursor-pointer">
-                  <Smartphone className="h-4 w-4 text-muted-foreground" />
-                  Accès application mobile
-                </Label>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>
-                Annuler
-              </Button>
-              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                {editingId ? "Enregistrer" : "Créer"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <UserEditDialog
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        user={editingUser}
+      />
 
       <Dialog open={!!resetModal} onOpenChange={(o) => !o && setResetModal(null)}>
         <DialogContent>

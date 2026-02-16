@@ -36,9 +36,26 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       active: true,
       mobileAccess: true,
       lastLoginAt: true,
+      failedLoginAttempts: true,
+      lockedUntil: true,
+      mustChangePassword: true,
       createdAt: true,
+      updatedAt: true,
       profilId: true,
-      profil: { select: { id: true, code: true, libelle: true } },
+      profil: {
+        select: {
+          id: true,
+          code: true,
+          libelle: true,
+          permissions: {
+            select: {
+              permission: {
+                select: { id: true, code: true, libelle: true, module: true },
+              },
+            },
+          },
+        },
+      },
     },
   });
 
@@ -59,10 +76,17 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     },
   });
 
+  // Flatten permissions from profil
+  const permissions = user.profil?.permissions?.map((pp) => pp.permission) ?? [];
+
   return NextResponse.json({
     ...user,
     lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
+    lockedUntil: user.lockedUntil?.toISOString() ?? null,
     createdAt: user.createdAt.toISOString(),
+    updatedAt: user.updatedAt.toISOString(),
+    profil: user.profil ? { id: user.profil.id, code: user.profil.code, libelle: user.profil.libelle } : null,
+    permissions,
     sessions: sessions.map((s) => ({
       ...s,
       expires: s.expires.toISOString(),

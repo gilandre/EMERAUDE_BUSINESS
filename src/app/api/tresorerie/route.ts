@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
-import { authOptions } from "@/lib/auth";
+import { getSession } from "@/lib/get-session";
 import { hasPermission } from "@/lib/permissions";
 import { conversionService } from "@/services/devises/conversion.service";
 import { withApiMetrics, type RouteContext } from "@/lib/api-metrics";
@@ -33,7 +32,7 @@ function dayKey(d: Date): string {
 }
 
 async function getHandler(req: Request, _ctx: RouteContext) {
-  const session = await getServerSession(authOptions);
+  const session = await getSession(req);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

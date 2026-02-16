@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
-import { authOptions } from "@/lib/auth";
+import { getSession } from "@/lib/get-session";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -11,7 +10,7 @@ interface RouteParams {
  * PATCH /api/notifications/[id] - Marquer comme lu (body: { lu: true })
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
-  const session = await getServerSession(authOptions);
+  const session = await getSession(request);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -44,8 +43,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 /**
  * DELETE /api/notifications/[id] - Supprimer une notification
  */
-export async function DELETE(_request: NextRequest, { params }: RouteParams) {
-  const session = await getServerSession(authOptions);
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  const session = await getSession(request);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

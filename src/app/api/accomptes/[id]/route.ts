@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
-import { authOptions } from "@/lib/auth";
+import { getSession } from "@/lib/get-session";
 import { hasPermission } from "@/lib/permissions";
 import { updateAccompteSchema } from "@/validations/accompte.schema";
 
@@ -9,8 +8,8 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
-export async function GET(_request: NextRequest, { params }: RouteParams) {
-  const session = await getServerSession(authOptions);
+export async function GET(request: NextRequest, { params }: RouteParams) {
+  const session = await getSession(request);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -52,7 +51,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 }
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
-  const session = await getServerSession(authOptions);
+  const session = await getSession(request);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -118,8 +117,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   });
 }
 
-export async function DELETE(_request: NextRequest, { params }: RouteParams) {
-  const session = await getServerSession(authOptions);
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  const session = await getSession(request);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

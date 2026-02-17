@@ -16,6 +16,7 @@ import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
+import { ChangePasswordScreen } from './src/screens/ChangePasswordScreen';
 import { BottomTabNavigator } from './src/navigation/BottomTabNavigator';
 
 SplashScreen.preventAutoHideAsync();
@@ -23,8 +24,8 @@ SplashScreen.preventAutoHideAsync();
 const Stack = createNativeStackNavigator();
 
 function AppNavigator() {
-  const { isAuthenticated, isLoading } = useAuth();
-  const { colors, isDark } = useTheme();
+  const { isAuthenticated, isLoading, user } = useAuth();
+  const { colors } = useTheme();
 
   if (isLoading) {
     return (
@@ -39,6 +40,14 @@ function AppNavigator() {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      </Stack.Navigator>
+    );
+  }
+
+  if (user?.mustChangePassword) {
+    return (
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
       </Stack.Navigator>
     );
   }

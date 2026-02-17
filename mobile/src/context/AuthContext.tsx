@@ -12,6 +12,7 @@ interface User {
   nom?: string;
   prenom?: string;
   permissions: string[];
+  mustChangePassword?: boolean;
 }
 
 interface AuthContextType {
@@ -22,6 +23,7 @@ interface AuthContextType {
   hasBiometricCredentials: boolean;
   login: (token: string, user: User) => Promise<void>;
   logout: () => Promise<void>;
+  clearMustChangePassword: () => Promise<void>;
   saveBiometricCredentials: (email: string, password: string) => Promise<void>;
   loginWithBiometrics: () => Promise<boolean>;
   checkBiometricAvailability: () => Promise<{ available: boolean; type: string }>;
@@ -62,6 +64,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await clearToken();
     setTokenState(null);
     setUser(null);
+  };
+
+  const clearMustChangePassword = async () => {
+    if (user) {
+      const updated = { ...user, mustChangePassword: false };
+      setUser(updated);
+      await setStoredUser(updated);
+    }
   };
 
   const saveBiometricCredentials = async (email: string, password: string) => {
@@ -132,6 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         hasBiometricCredentials,
         login,
         logout,
+        clearMustChangePassword,
         saveBiometricCredentials,
         loginWithBiometrics,
         checkBiometricAvailability,

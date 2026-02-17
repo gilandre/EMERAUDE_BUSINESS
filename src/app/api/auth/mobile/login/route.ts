@@ -119,6 +119,7 @@ export async function POST(request: NextRequest) {
         nom: user.nom,
         prenom: user.prenom,
         permissions,
+        mustChangePassword: user.mustChangePassword,
       },
     });
   } catch {

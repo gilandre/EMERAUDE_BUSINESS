@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import redis from "@/lib/redis";
 import os from "os";
+import fs from "fs";
 import checkDiskSpace from "check-disk-space";
 import { withApiMetrics, type RouteContext } from "@/lib/api-metrics";
 
@@ -48,7 +49,6 @@ function checkMemory(): { status: string; usage?: number; heapMB?: number; avail
     // Falls back to os.freemem() on non-Linux platforms
     let availableMem = os.freemem();
     try {
-      const fs = require("fs");
       const meminfo = fs.readFileSync("/proc/meminfo", "utf8");
       const match = meminfo.match(/MemAvailable:\s+(\d+)\s+kB/);
       if (match) availableMem = parseInt(match[1], 10) * 1024;

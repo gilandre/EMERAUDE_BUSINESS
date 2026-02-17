@@ -54,8 +54,8 @@ jobs:
           tags: |
             ${{ env.IMAGE_NAME }}:latest
             ${{ env.IMAGE_NAME }}:${{ steps.sha.outputs.short }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=app
+          cache-to: type=gha,scope=app,mode=max
 
       - name: Build and push migrator image
         uses: docker/build-push-action@v6

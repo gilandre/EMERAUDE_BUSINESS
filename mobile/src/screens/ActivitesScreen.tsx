@@ -15,8 +15,9 @@ import {
   SlidersHorizontal,
   ChevronRight,
   Activity,
-  CheckCircle,
-  Archive,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Wallet,
   X,
 } from 'lucide-react-native';
 import { Card } from '../components/Card';
@@ -132,6 +133,10 @@ export function ActivitesScreen() {
   const totalCount = data?.total ?? items.length;
   const actives = items.filter((a) => a.statut === 'ACTIVE').length;
   const soldeGlobal = items.reduce((sum, a) => sum + (a.soldeXOF ?? a.solde ?? 0), 0);
+  const totalEntreesGlobal = items.reduce((sum, a) => sum + (a.totalEntrees ?? 0), 0);
+  const totalSortiesGlobal = items.reduce((sum, a) => sum + (a.totalSorties ?? 0), 0);
+
+  const fmtShort = (n: number) => formatMontant(n, 'XOF').replace(' FCFA', '');
 
   return (
     <View style={styles.wrapper}>
@@ -142,24 +147,35 @@ export function ActivitesScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
         }
       >
-        {/* Stats Chips */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll}>
-          <View style={styles.chip}>
-            <Activity size={16} color={colors.primary} style={{ marginBottom: 4 }} />
-            <Text style={styles.chipValue}>{totalCount}</Text>
-            <Text style={styles.chipLabel}>Total</Text>
+        {/* Hero Solde Global */}
+        <View style={[styles.heroCard, { backgroundColor: colors.primary }]}>
+          <View style={styles.heroTopRow}>
+            <View style={styles.heroLabelRow}>
+              <Wallet size={20} color="rgba(255,255,255,0.8)" />
+              <Text style={styles.heroLabel}>Solde Global Activités</Text>
+            </View>
+            <View style={styles.heroCountBadge}>
+              <Text style={styles.heroCountText}>{totalCount} activité{totalCount !== 1 ? 's' : ''} · {actives} active{actives !== 1 ? 's' : ''}</Text>
+            </View>
           </View>
-          <View style={styles.chip}>
-            <CheckCircle size={16} color={colors.primary} style={{ marginBottom: 4 }} />
-            <Text style={[styles.chipValue, { color: colors.primary }]}>{actives}</Text>
-            <Text style={styles.chipLabel}>Actives</Text>
+          <Text style={[styles.heroAmount, { color: soldeGlobal >= 0 ? '#fff' : '#fecaca' }]}>
+            {fmtShort(soldeGlobal)} FCFA
+          </Text>
+        </View>
+
+        {/* KPIs Entrées / Sorties */}
+        <View style={styles.kpiRow}>
+          <View style={[styles.kpiCard, { backgroundColor: colors.card }]}>
+            <ArrowDownLeft size={20} color="#22c55e" />
+            <Text style={styles.kpiLabel}>Entrées</Text>
+            <Text style={[styles.kpiValue, { color: '#22c55e' }]}>{fmtShort(totalEntreesGlobal)}</Text>
           </View>
-          <View style={styles.chip}>
-            <Archive size={16} color={colors.textMuted} style={{ marginBottom: 4 }} />
-            <Text style={styles.chipValue}>{formatMontant(soldeGlobal)}</Text>
-            <Text style={styles.chipLabel}>Solde global</Text>
+          <View style={[styles.kpiCard, { backgroundColor: colors.card }]}>
+            <ArrowUpRight size={20} color="#f59e0b" />
+            <Text style={styles.kpiLabel}>Sorties</Text>
+            <Text style={[styles.kpiValue, { color: '#f59e0b' }]}>{fmtShort(totalSortiesGlobal)}</Text>
           </View>
-        </ScrollView>
+        </View>
 
         {/* Search */}
         <View style={styles.searchRow}>
@@ -298,30 +314,66 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: spacing.md, paddingBottom: spacing.xxl + 80 },
 
-  // Chips
-  chipsScroll: { marginBottom: spacing.md },
-  chip: {
-    backgroundColor: colors.surface,
-    borderRadius: 20,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.smd,
-    marginRight: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
+  // Hero
+  heroCard: {
+    borderRadius: 16,
+    padding: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    minWidth: 110,
+    marginBottom: spacing.sm,
   },
-  chipValue: {
-    fontSize: typography.fontSizes.base,
-    fontFamily: typography.fontFamily.bold,
-    fontWeight: typography.fontWeights.bold as '700',
-    color: colors.text,
+  heroLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  chipLabel: {
+  heroLabel: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: typography.fontSizes.sm,
+    fontFamily: typography.fontFamily.medium,
+  },
+  heroCountBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 12,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+  heroCountText: {
+    color: 'rgba(255,255,255,0.9)',
     fontSize: typography.fontSizes.xxs,
     fontFamily: typography.fontFamily.medium,
-    color: colors.textMuted,
-    marginTop: spacing.xxs,
+  },
+  heroAmount: {
+    fontSize: 28,
+    fontFamily: typography.fontFamily.bold,
+    fontWeight: '700' as '700',
+  },
+
+  // KPIs
+  kpiRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  kpiCard: {
+    flex: 1,
+    borderRadius: 12,
+    padding: spacing.md,
+    gap: 6,
+  },
+  kpiLabel: {
+    fontSize: typography.fontSizes.xs,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textSecondary,
+  },
+  kpiValue: {
+    fontSize: typography.fontSizes.lg,
+    fontFamily: typography.fontFamily.bold,
+    fontWeight: '700' as '700',
   },
 
   // Search

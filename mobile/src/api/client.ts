@@ -65,7 +65,8 @@ export async function apiFetch<T>(
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    throw new Error((data as { error?: string }).error || 'Erreur réseau');
+    const msg = (data as { error?: string }).error || `Erreur serveur (${res.status})`;
+    throw new Error(msg);
   }
 
   // Cache GET responses

@@ -28,6 +28,9 @@ import { ConfigurationRappelsScreen } from '../screens/ConfigurationRappelsScree
 import { ParametresNotificationsScreen } from '../screens/ParametresNotificationsScreen';
 import { InfoPersonnellesScreen } from '../screens/InfoPersonnellesScreen';
 import { SecuriteScreen } from '../screens/SecuriteScreen';
+import { ActivitesScreen } from '../screens/ActivitesScreen';
+import { ActiviteDetailScreen } from '../screens/ActiviteDetailScreen';
+import { CreateActiviteScreen } from '../screens/CreateActiviteScreen';
 
 import { typography } from '../theme';
 import { useTheme } from '../context/ThemeContext';
@@ -169,6 +172,21 @@ function TresorerieStackScreen() {
         name="DecaissementDetail"
         component={DecaissementDetailScreen}
         options={{ title: 'Détail décaissement' }}
+      />
+      <TresorerieStack.Screen
+        name="ActivitesList"
+        component={ActivitesScreen}
+        options={{ title: 'Activités' }}
+      />
+      <TresorerieStack.Screen
+        name="ActiviteDetail"
+        component={ActiviteDetailScreen}
+        options={{ title: 'Détail activité' }}
+      />
+      <TresorerieStack.Screen
+        name="CreateActivite"
+        component={CreateActiviteScreen}
+        options={{ title: 'Nouvelle activité' }}
       />
     </TresorerieStack.Navigator>
   );

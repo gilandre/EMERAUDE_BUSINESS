@@ -1,6 +1,6 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# EMERAUDE BUSINESS - Stack complète
-# app x3, postgres, redis, nginx, prometheus, grafana
+# EMERAUDE BUSINESS - Stack complète (optimisée mémoire)
+# app x2, postgres, redis, nginx, prometheus, grafana
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
@@ -12,6 +12,7 @@ services:
     env_file: .env
     environment:
       - NODE_ENV=production
+      - NODE_OPTIONS=--max-old-space-size=384
       - DATABASE_URL=postgresql://${POSTGRES_USER:-emeraude}:${POSTGRES_PASSWORD:-emeraude}@postgres:5432/${POSTGRES_DB:-emeraude}
       - REDIS_URL=redis://redis:6379
       - NEXTAUTH_URL=http://localhost
@@ -19,6 +20,10 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_started }
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     networks: [backend]
 
   app2:
@@ -28,6 +33,7 @@ services:
     env_file: .env
     environment:
       - NODE_ENV=production
+      - NODE_OPTIONS=--max-old-space-size=384
       - DATABASE_URL=postgresql://${POSTGRES_USER:-emeraude}:${POSTGRES_PASSWORD:-emeraude}@postgres:5432/${POSTGRES_DB:-emeraude}
       - REDIS_URL=redis://redis:6379
       - NEXTAUTH_URL=http://localhost
@@ -35,22 +41,10 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_started }
-    networks: [backend]
-
-  app3:
-    image: emeraude-business-app
-    container_name: emeraude-app3
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-emeraude}:${POSTGRES_PASSWORD:-emeraude}@postgres:5432/${POSTGRES_DB:-emeraude}
-      - REDIS_URL=redis://redis:6379
-      - NEXTAUTH_URL=http://localhost
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-change-me-in-production}
-    depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_started }
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     networks: [backend]
 
   nginx:
@@ -59,7 +53,11 @@ services:
     restart: unless-stopped
     ports: ["80:80"]
     volumes: ["./nginx.conf:/etc/nginx/conf.d/default.conf:ro"]
-    depends_on: [app1, app2, app3]
+    depends_on: [app1, app2]
+    deploy:
+      resources:
+        limits:
+          memory: 64M
     networks: [backend, frontend]
 
   postgres:
@@ -70,25 +68,43 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-emeraude}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-emeraude}
       POSTGRES_DB: ${POSTGRES_DB:-emeraude}
+    command:
+      - postgres
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - work_mem=4MB
+      - -c
+      - effective_cache_size=256MB
+      - -c
+      - maintenance_work_mem=64MB
     volumes: [postgres_data:/var/lib/postgresql/data]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-emeraude} -d ${POSTGRES_DB:-emeraude}"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     networks: [backend]
 
   redis:
     image: redis:7-alpine
     container_name: emeraude-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --maxmemory 64mb --maxmemory-policy allkeys-lru
     volumes: [redis_data:/data]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      interval: 10s
       timeout: 3s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 96M
     networks: [backend]
 
   prometheus:
@@ -99,10 +115,16 @@ services:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
       - --web.enable-lifecycle
+      - --storage.tsdb.retention.time=7d
+      - --storage.tsdb.retention.size=256MB
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     ports: ["9090:9090"]
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     networks: [backend, frontend]
 
   grafana:
@@ -120,6 +142,10 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
     ports: ["3001:3001"]
     depends_on: [prometheus]
+    deploy:
+      resources:
+        limits:
+          memory: 192M
     networks: [backend, frontend]
 
 volumes:

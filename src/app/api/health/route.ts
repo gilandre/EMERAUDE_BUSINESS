@@ -38,13 +38,15 @@ async function checkDisk(): Promise<{ status: string; usage?: number }> {
   }
 }
 
-function checkMemory(): { status: string; usage?: number } {
+function checkMemory(): { status: string; usage?: number; heapMB?: number; systemFreeMB?: number } {
   try {
-    const used = process.memoryUsage().heapUsed;
-    const total = process.memoryUsage().heapTotal;
-    const usage = total > 0 ? Math.round((used / total) * 100) : 0;
-    const isHealthy = usage < 90;
-    return { status: isHealthy ? "healthy" : "warning", usage };
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usage = totalMem > 0 ? Math.round(((totalMem - freeMem) / totalMem) * 100) : 0;
+    const heapMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+    const systemFreeMB = Math.round(freeMem / 1024 / 1024);
+    const isHealthy = usage < 85;
+    return { status: isHealthy ? "healthy" : "warning", usage, heapMB, systemFreeMB };
   } catch {
     return { status: "unknown" };
   }

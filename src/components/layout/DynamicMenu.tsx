@@ -21,6 +21,7 @@ import {
   Cog,
   Activity,
   DollarSign,
+  FolderOpen,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -50,6 +51,7 @@ const iconMap: Record<string, LucideIcon> = {
   Cog,
   Activity,
   DollarSign,
+  FolderOpen,
 };
 
 function IconForItem({ name, className }: { name: string | null; className?: string }) {
@@ -62,6 +64,7 @@ function IconForItem({ name, className }: { name: string | null; className?: str
 const defaultItems: { href: string; label: string; icon: string }[] = [
   { href: "/dashboard", label: "Dashboard", icon: "LayoutDashboard" },
   { href: "/marches", label: "Marchés", icon: "Briefcase" },
+  { href: "/activites", label: "Activités", icon: "FolderOpen" },
   { href: "/tresorerie", label: "Trésorerie", icon: "Wallet" },
   { href: "/rapports", label: "Rapports", icon: "FileText" },
   { href: "/admin/alertes", label: "Alertes", icon: "Bell" },
@@ -173,6 +176,7 @@ function MenuList({ items, level = 0 }: { items: MenuItem[]; level?: number }) {
 const prefetchMap: Record<string, { queryKey: string[]; url: string }> = {
   "/dashboard": { queryKey: ["dashboard"], url: "/api/dashboard?period=30d" },
   "/marches": { queryKey: ["marches", "1", "10", "", "prefetch"], url: "/api/marches?page=1&pageSize=10" },
+  "/activites": { queryKey: ["activites", "1", "10", "", "prefetch"], url: "/api/activites?page=1&pageSize=10" },
   "/tresorerie": { queryKey: ["tresorerie", "30d"], url: "/api/tresorerie?period=30d" },
 };
 

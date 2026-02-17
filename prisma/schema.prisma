@@ -54,6 +54,7 @@ model User {
   declarations     DeclarationUsage[]  @relation("UserDeclarations")
   discussions      Discussion[]        @relation("UserDiscussions")
   messages         Message[]           @relation("UserMessages")
+  activites        Activite[]          @relation("UserActivites")
 }
 
 model UserNotificationPreferences {
@@ -271,6 +272,7 @@ model Devise {
 
   // RELATIONS
   marches           Marche[]
+  activites         Activite[]
   tauxChanges       TauxChange[]
 
   createdAt         DateTime  @default(now()) @map("created_at")
@@ -711,6 +713,7 @@ model Beneficiaire {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   decaissements  Decaissement[]
+  mouvementsActivite MouvementActivite[]
 
   @@index([actif])
   @@index([nom])
@@ -797,6 +800,110 @@ model DeclarationLigne {
   libelle       String
   montant       Decimal          @db.Decimal(15, 2)
   createdAt     DateTime         @default(now())
+}
+
+// =============================================================================
+// ACTIVITÉS - Suivi entrées/sorties sans budget prédéfini
+// =============================================================================
+
+enum TypeActivite {
+  MISSION
+  EVENEMENT
+  PROJET
+  FORMATION
+  FONCTIONNEMENT
+  AUTRE
+}
+
+enum StatutActivite {
+  ACTIVE
+  CLOTUREE
+  ARCHIVEE
+}
+
+enum SensMouvement {
+  ENTREE
+  SORTIE
+}
+
+model Activite {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  libelle     String
+  description String?
+  type        TypeActivite @default(AUTRE)
+  statut      StatutActivite @default(ACTIVE)
+
+  // BUDGET PRÉVISIONNEL (indicatif, non bloquant)
+  budgetPrevisionnel    Decimal? @db.Decimal(15, 2) @map("budget_previsionnel")
+  budgetPrevisionnelXOF Decimal? @db.Decimal(15, 2) @map("budget_previsionnel_xof")
+
+  // DEVISE
+  deviseId          String   @map("devise_id")
+  devise            Devise   @relation(fields: [deviseId], references: [id])
+  deviseCode        String   @default("XOF") @map("devise_code")
+  tauxChangeCreation Decimal  @db.Decimal(15, 6) @map("taux_change_creation")
+
+  // TOTAUX DÉNORMALISÉS (mis à jour à chaque mouvement)
+  totalEntrees       Decimal  @default(0) @db.Decimal(15, 2) @map("total_entrees")
+  totalEntreesXOF    Decimal  @default(0) @db.Decimal(15, 2) @map("total_entrees_xof")
+  totalSorties       Decimal  @default(0) @db.Decimal(15, 2) @map("total_sorties")
+  totalSortiesXOF    Decimal  @default(0) @db.Decimal(15, 2) @map("total_sorties_xof")
+  solde              Decimal  @default(0) @db.Decimal(15, 2)
+  soldeXOF           Decimal  @default(0) @db.Decimal(15, 2) @map("solde_xof")
+
+  // DATES
+  dateDebut   DateTime? @map("date_debut")
+  dateFin     DateTime? @map("date_fin")
+
+  // RESPONSABLE
+  responsableId String? @map("responsable_id")
+  responsable   User?   @relation("UserActivites", fields: [responsableId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  mouvements  MouvementActivite[]
+
+  @@index([statut])
+  @@index([type])
+  @@index([updatedAt(sort: Desc)])
+  @@index([deviseId])
+  @@index([responsableId])
+  @@map("activites")
+}
+
+model MouvementActivite {
+  id            String   @id @default(cuid())
+  activiteId    String   @map("activite_id")
+  sens          SensMouvement
+  montant       Decimal  @db.Decimal(15, 2)
+  montantXOF    Decimal  @db.Decimal(15, 2) @map("montant_xof")
+  tauxChange    Decimal  @db.Decimal(15, 6) @map("taux_change")
+  dateMouvement DateTime @map("date_mouvement")
+  categorie     String?
+  reference     String?
+  description   String?
+  motif         String?
+
+  // Bénéficiaire (pour les sorties)
+  beneficiaire   String?
+  beneficiaireId String?  @map("beneficiaire_id")
+  beneficiaireRef Beneficiaire? @relation(fields: [beneficiaireId], references: [id])
+
+  // Mode de paiement
+  modePaiement  String?  @map("mode_paiement")
+
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  activite      Activite @relation(fields: [activiteId], references: [id], onDelete: Cascade)
+
+  @@index([activiteId])
+  @@index([dateMouvement(sort: Desc)])
+  @@index([sens])
+  @@index([beneficiaireId])
+  @@map("mouvements_activite")
 }
 
 // =============================================================================

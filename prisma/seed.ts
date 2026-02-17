@@ -29,6 +29,11 @@ async function main() {
     { libelle: "Valider décaissements", code: "decaissements:validate", module: "decaissements" },
     { libelle: "Voir préfinancements", code: "prefinancements:read", module: "prefinancements" },
     { libelle: "Autoriser préfinancements", code: "prefinancements:authorize", module: "prefinancements" },
+    { libelle: "Voir activités", code: "activites:read", module: "activites" },
+    { libelle: "Créer activités", code: "activites:create", module: "activites" },
+    { libelle: "Modifier activités", code: "activites:update", module: "activites" },
+    { libelle: "Supprimer activités", code: "activites:delete", module: "activites" },
+    { libelle: "Exporter activités", code: "activites:export", module: "activites" },
     { libelle: "Voir alertes", code: "alertes:read", module: "alertes" },
     { libelle: "Créer alertes", code: "alertes:create", module: "alertes" },
     { libelle: "Modifier alertes", code: "alertes:update", module: "alertes" },
@@ -265,6 +270,20 @@ async function main() {
     },
   });
 
+  await prisma.menu.upsert({
+    where: { code: "ACTIVITES" },
+    update: {},
+    create: {
+      code: "ACTIVITES",
+      libelle: "Activités",
+      path: "/activites",
+      icon: "FolderOpen",
+      ordre: 3,
+      active: true,
+      permission: "activites:read",
+    },
+  });
+
   const menuTresorerie = await prisma.menu.upsert({
     where: { code: "TRESORERIE" },
     update: {},
@@ -273,7 +292,7 @@ async function main() {
       libelle: "Trésorerie",
       path: "/tresorerie",
       icon: "Wallet",
-      ordre: 3,
+      ordre: 4,
       active: true,
     },
   });
@@ -384,6 +403,20 @@ async function main() {
       code: "MARCHE_CREE",
       libelle: "Nouveau marché créé",
       description: "Déclenché à la création d'un marché",
+      canaux: ["email"],
+      active: true,
+    },
+    {
+      code: "MOUVEMENT_ACTIVITE",
+      libelle: "Mouvement activité enregistré",
+      description: "Déclenché à chaque nouveau mouvement sur une activité",
+      canaux: ["email"],
+      active: true,
+    },
+    {
+      code: "ACTIVITE_SOLDE_NEGATIF",
+      libelle: "Solde activité négatif",
+      description: "Déclenché quand le solde d'une activité devient négatif",
       canaux: ["email"],
       active: true,
     },

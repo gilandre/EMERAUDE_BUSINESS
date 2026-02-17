@@ -38,15 +38,28 @@ async function checkDisk(): Promise<{ status: string; usage?: number }> {
   }
 }
 
-function checkMemory(): { status: string; usage?: number; heapMB?: number; systemFreeMB?: number } {
+function checkMemory(): { status: string; usage?: number; heapMB?: number; availableMB?: number; totalMB?: number } {
   try {
     const totalMem = os.totalmem();
-    const freeMem = os.freemem();
-    const usage = totalMem > 0 ? Math.round(((totalMem - freeMem) / totalMem) * 100) : 0;
+    const totalMB = Math.round(totalMem / 1024 / 1024);
     const heapMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
-    const systemFreeMB = Math.round(freeMem / 1024 / 1024);
+
+    // Use MemAvailable from /proc/meminfo (includes reclaimable cache/buffers)
+    // Falls back to os.freemem() on non-Linux platforms
+    let availableMem = os.freemem();
+    try {
+      const fs = require("fs");
+      const meminfo = fs.readFileSync("/proc/meminfo", "utf8");
+      const match = meminfo.match(/MemAvailable:\s+(\d+)\s+kB/);
+      if (match) availableMem = parseInt(match[1], 10) * 1024;
+    } catch {
+      // Not Linux or no access — use os.freemem()
+    }
+
+    const availableMB = Math.round(availableMem / 1024 / 1024);
+    const usage = totalMem > 0 ? Math.round(((totalMem - availableMem) / totalMem) * 100) : 0;
     const isHealthy = usage < 85;
-    return { status: isHealthy ? "healthy" : "warning", usage, heapMB, systemFreeMB };
+    return { status: isHealthy ? "healthy" : "warning", usage, heapMB, availableMB, totalMB };
   } catch {
     return { status: "unknown" };
   }

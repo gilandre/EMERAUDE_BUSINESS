@@ -28,6 +28,7 @@ FROM base AS migrator
 COPY --from=deps /app/node_modules ./node_modules
 COPY prisma ./prisma
 COPY package.json ./
+RUN npx prisma generate
 CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed"]
 
 # ─── Runner (image finale) ─────────────────────────────────────────────────

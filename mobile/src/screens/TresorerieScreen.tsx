@@ -6,7 +6,6 @@ import {
 import {
   Wallet, ArrowDownLeft, ArrowUpRight, AlertTriangle,
   Users, Receipt, ChevronRight, TrendingUp, TrendingDown,
-  Activity,
 } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { typography, spacing } from '../theme';
@@ -96,20 +95,6 @@ export function TresorerieScreen({ navigation }: any) {
 
       {/* Quick Actions */}
       <Text style={[styles.sectionTitle, { color: colors.text }]}>Accès rapide</Text>
-
-      <TouchableOpacity
-        style={[styles.actionRow, { backgroundColor: colors.card }]}
-        onPress={() => navigation.navigate('ActivitesList')}
-      >
-        <View style={[styles.actionIcon, { backgroundColor: 'rgba(16,183,127,0.1)' }]}>
-          <Activity size={20} color={colors.primary} />
-        </View>
-        <View style={styles.actionText}>
-          <Text style={[styles.actionLabel, { color: colors.text }]}>Activités</Text>
-          <Text style={[styles.actionSub, { color: colors.textMuted }]}>Suivi financier des activités</Text>
-        </View>
-        <ChevronRight size={20} color={colors.textMuted} />
-      </TouchableOpacity>
 
       <TouchableOpacity
         style={[styles.actionRow, { backgroundColor: colors.card }]}

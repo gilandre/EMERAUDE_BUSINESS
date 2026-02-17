@@ -105,20 +105,36 @@ export function ActiviteDetailScreen() {
   const [showSorForm, setShowSorForm] = useState(false);
 
   const load = useCallback(async () => {
-    try {
-      setError(false);
-      const [activite, mvts] = await Promise.all([
-        getActivite(id),
-        getMouvements(id, new URLSearchParams({ pageSize: '50', sortBy: 'dateMouvement', sortOrder: 'desc' })),
-      ]);
-      setData(activite);
-      setMouvements(mvts.data);
-    } catch {
-      setError(true);
-      setData(null);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+    setError(false);
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        // Wait 1s before retry
+        if (attempt > 0) await new Promise((r) => setTimeout(r, 1000));
+
+        // Load activite + mouvements in parallel, tolerate mouvement failure
+        const [activiteResult, mvtsResult] = await Promise.allSettled([
+          getActivite(id),
+          getMouvements(id, new URLSearchParams({ pageSize: '50' })),
+        ]);
+
+        if (activiteResult.status === 'rejected') throw activiteResult.reason;
+
+        setData(activiteResult.value);
+        setMouvements(
+          mvtsResult.status === 'fulfilled' ? mvtsResult.value.data : [],
+        );
+        setLoading(false);
+        setRefreshing(false);
+        return; // success
+      } catch {
+        if (attempt === 1) {
+          setError(true);
+          setData(null);
+          setLoading(false);
+          setRefreshing(false);
+        }
+      }
     }
   }, [id]);
 

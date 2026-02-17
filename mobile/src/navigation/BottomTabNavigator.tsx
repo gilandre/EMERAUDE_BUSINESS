@@ -1,9 +1,9 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View, Platform, TouchableOpacity, StyleSheet } from 'react-native';
+import { Platform } from 'react-native';
 import {
-  LayoutDashboard, Briefcase, Plus, Wallet, User,
+  LayoutDashboard, Briefcase, Activity, Wallet, User,
 } from 'lucide-react-native';
 
 // Screens
@@ -38,6 +38,7 @@ import { useTheme } from '../context/ThemeContext';
 const Tab = createBottomTabNavigator();
 const DashboardStack = createNativeStackNavigator();
 const MarchesStack = createNativeStackNavigator();
+const ActivitesStack = createNativeStackNavigator();
 const TresorerieStack = createNativeStackNavigator();
 const ProfilStack = createNativeStackNavigator();
 
@@ -123,7 +124,31 @@ function MarchesStackScreen() {
   );
 }
 
-// ─── Trésorerie Stack (NOUVEAU) ──────────────────────────────────
+// ─── Activités Stack ─────────────────────────────────────────────
+function ActivitesStackScreen() {
+  const screenOptions = useStackScreenOptions();
+  return (
+    <ActivitesStack.Navigator screenOptions={screenOptions}>
+      <ActivitesStack.Screen
+        name="ActivitesList"
+        component={ActivitesScreen}
+        options={{ title: 'Activités' }}
+      />
+      <ActivitesStack.Screen
+        name="ActiviteDetail"
+        component={ActiviteDetailScreen}
+        options={{ title: 'Détail activité' }}
+      />
+      <ActivitesStack.Screen
+        name="CreateActivite"
+        component={CreateActiviteScreen}
+        options={{ title: 'Nouvelle activité' }}
+      />
+    </ActivitesStack.Navigator>
+  );
+}
+
+// ─── Trésorerie Stack ────────────────────────────────────────────
 function TresorerieStackScreen() {
   const screenOptions = useStackScreenOptions();
   return (
@@ -173,21 +198,6 @@ function TresorerieStackScreen() {
         component={DecaissementDetailScreen}
         options={{ title: 'Détail décaissement' }}
       />
-      <TresorerieStack.Screen
-        name="ActivitesList"
-        component={ActivitesScreen}
-        options={{ title: 'Activités' }}
-      />
-      <TresorerieStack.Screen
-        name="ActiviteDetail"
-        component={ActiviteDetailScreen}
-        options={{ title: 'Détail activité' }}
-      />
-      <TresorerieStack.Screen
-        name="CreateActivite"
-        component={CreateActiviteScreen}
-        options={{ title: 'Nouvelle activité' }}
-      />
     </TresorerieStack.Navigator>
   );
 }
@@ -224,11 +234,6 @@ function ProfilStackScreen() {
       />
     </ProfilStack.Navigator>
   );
-}
-
-// Dummy screen for the center "+" tab (never renders)
-function DummyScreen() {
-  return <View />;
 }
 
 // ─── Main Tab Navigator ───────────────────────────────────────────
@@ -272,26 +277,12 @@ export function BottomTabNavigator() {
         }}
       />
       <Tab.Screen
-        name="Nouveau"
-        component={DummyScreen}
+        name="Activites"
+        component={ActivitesStackScreen}
         options={{
-          tabBarLabel: () => null,
-          tabBarIcon: () => null,
-          tabBarButton: (props) => (
-            <CreateButton
-              {...props}
-              isDark={isDark}
-              bgColor={colors.primary}
-              borderColor={isDark ? colors.background : '#fff'}
-            />
-          ),
+          tabBarLabel: 'Activités',
+          tabBarIcon: ({ color, size }) => <Activity size={size ?? 22} color={color} />,
         }}
-        listeners={({ navigation }) => ({
-          tabPress: (e) => {
-            e.preventDefault();
-            navigation.navigate('Marches', { screen: 'CreateMarche' });
-          },
-        })}
       />
       <Tab.Screen
         name="Tresorerie"
@@ -313,47 +304,3 @@ export function BottomTabNavigator() {
   );
 }
 
-// ─── FAB Create Button ────────────────────────────────────────────
-function CreateButton({
-  isDark,
-  bgColor,
-  borderColor,
-  ...props
-}: {
-  isDark: boolean;
-  bgColor: string;
-  borderColor: string;
-  [key: string]: any;
-}) {
-  return (
-    <TouchableOpacity
-      {...props}
-      style={[fabStyles.container, { shadowColor: bgColor }]}
-      activeOpacity={0.8}
-    >
-      <View style={[fabStyles.button, { backgroundColor: bgColor, borderColor }]}>
-        <Plus size={28} color="#fff" strokeWidth={1.5} />
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-const fabStyles = StyleSheet.create({
-  container: {
-    top: -16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  button: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 4,
-  },
-});

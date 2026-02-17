@@ -44,9 +44,11 @@ export function UserEditDialog({ open, onOpenChange, user, onSuccess }: UserEdit
     profilId: "",
     mobileAccess: false,
   });
+  const [changePassword, setChangePassword] = useState(false);
 
   useEffect(() => {
     if (open) {
+      setChangePassword(false);
       if (user) {
         setForm({
           email: user.email,
@@ -93,7 +95,7 @@ export function UserEditDialog({ open, onOpenChange, user, onSuccess }: UserEdit
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, ...payload }: { id: string; email?: string; nom?: string; prenom?: string; profilId?: string | null; mobileAccess?: boolean }) => {
+    mutationFn: async ({ id, ...payload }: { id: string; email?: string; password?: string; nom?: string; prenom?: string; profilId?: string | null; mobileAccess?: boolean }) => {
       const res = await fetch(`/api/users/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -116,14 +118,22 @@ export function UserEditDialog({ open, onOpenChange, user, onSuccess }: UserEdit
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isEdit && user) {
-      updateMutation.mutate({
+      if (changePassword && form.password && form.password.length < 8) {
+        toast.error("Mot de passe minimum 8 caractères");
+        return;
+      }
+      const payload: { id: string; email?: string; password?: string; nom?: string; prenom?: string; profilId?: string | null; mobileAccess?: boolean } = {
         id: user.id,
         email: form.email,
         nom: form.nom || undefined,
         prenom: form.prenom || undefined,
         profilId: form.profilId || null,
         mobileAccess: form.mobileAccess,
-      });
+      };
+      if (changePassword && form.password) {
+        payload.password = form.password;
+      }
+      updateMutation.mutate(payload);
     } else {
       if (!form.password || form.password.length < 8) {
         toast.error("Mot de passe minimum 8 caractères");
@@ -156,10 +166,9 @@ export function UserEditDialog({ open, onOpenChange, user, onSuccess }: UserEdit
                 value={form.email}
                 onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
                 required
-                disabled={isEdit}
               />
             </div>
-            {!isEdit && (
+            {!isEdit ? (
               <div>
                 <Label htmlFor="edit-password">Mot de passe *</Label>
                 <Input
@@ -170,6 +179,36 @@ export function UserEditDialog({ open, onOpenChange, user, onSuccess }: UserEdit
                   minLength={8}
                   placeholder="Min. 8 caractères"
                 />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="edit-changePassword"
+                    checked={changePassword}
+                    onChange={(e) => {
+                      setChangePassword(e.target.checked);
+                      if (!e.target.checked) setForm((p) => ({ ...p, password: "" }));
+                    }}
+                    className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <Label htmlFor="edit-changePassword" className="cursor-pointer">
+                    Changer le mot de passe
+                  </Label>
+                </div>
+                {changePassword && (
+                  <div>
+                    <Input
+                      id="edit-password"
+                      type="password"
+                      value={form.password}
+                      onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+                      minLength={8}
+                      placeholder="Nouveau mot de passe (min. 8 caractères)"
+                    />
+                  </div>
+                )}
               </div>
             )}
             <div className="grid grid-cols-2 gap-4">

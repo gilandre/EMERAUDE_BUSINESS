@@ -39,6 +39,8 @@ import {
   Smartphone,
   AlertTriangle,
   Lock,
+  Unlock,
+  LogOut,
   Monitor,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -154,6 +156,59 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const unlockMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/users/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ failedLoginAttempts: 0, lockedUntil: null }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error ?? "Erreur");
+      return d;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-user", id] });
+      toast.success("Compte débloqué");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const forcePasswordChangeMutation = useMutation({
+    mutationFn: async (mustChange: boolean) => {
+      const res = await fetch(`/api/users/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mustChangePassword: mustChange }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error ?? "Erreur");
+      return d;
+    },
+    onSuccess: (_, mustChange) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-user", id] });
+      toast.success(mustChange ? "Changement de mot de passe forcé" : "Obligation de changement retirée");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const revokeSessionMutation = useMutation({
+    mutationFn: async (sessionId?: string) => {
+      const url = sessionId
+        ? `/api/users/${id}/sessions?sessionId=${sessionId}`
+        : `/api/users/${id}/sessions`;
+      const res = await fetch(url, { method: "DELETE" });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error ?? "Erreur révocation");
+      return d;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-user", id] });
+      toast.success("Session(s) révoquée(s)");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   if (isLoading) {
     return (
       <div className="space-y-6 p-6">
@@ -218,6 +273,26 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           <Button variant="outline" size="sm" onClick={() => setResetOpen(true)}>
             <Key className="h-4 w-4 mr-1" />
             Reset MDP
+          </Button>
+          {(user.lockedUntil || user.failedLoginAttempts > 0) && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => unlockMutation.mutate()}
+              disabled={unlockMutation.isPending}
+            >
+              <Unlock className="h-4 w-4 mr-1" />
+              Débloquer
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => forcePasswordChangeMutation.mutate(!user.mustChangePassword)}
+            disabled={forcePasswordChangeMutation.isPending}
+          >
+            <Key className="h-4 w-4 mr-1" />
+            {user.mustChangePassword ? "Retirer obligation MDP" : "Forcer changement MDP"}
           </Button>
           <Button
             variant="outline"
@@ -379,7 +454,23 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
         <TabsContent value="sessions">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Sessions actives</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">Sessions actives</CardTitle>
+                {user.sessions.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => {
+                      if (confirm("Déconnecter toutes les sessions ?")) revokeSessionMutation.mutate(undefined);
+                    }}
+                    disabled={revokeSessionMutation.isPending}
+                  >
+                    <LogOut className="h-4 w-4 mr-1" />
+                    Tout déconnecter
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {user.sessions.length === 0 ? (
@@ -392,6 +483,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                       <TableHead>Expire le</TableHead>
                       <TableHead>Adresse IP</TableHead>
                       <TableHead>User Agent</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -409,6 +501,18 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                           <TableCell className="text-sm text-muted-foreground">{s.ipAddress ?? "—"}</TableCell>
                           <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate" title={s.userAgent ?? ""}>
                             {s.userAgent ?? "—"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => revokeSessionMutation.mutate(s.id)}
+                              disabled={revokeSessionMutation.isPending}
+                              title="Révoquer cette session"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </TableCell>
                         </TableRow>
                       );

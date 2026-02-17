@@ -121,13 +121,34 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 404 });
   }
 
-  const data: { email?: string; nom?: string | null; prenom?: string | null; name?: string | null; profilId?: string | null; active?: boolean; mobileAccess?: boolean } = {};
-  if (parsed.data.email !== undefined) data.email = parsed.data.email;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data: Record<string, any> = {};
+
+  // Email with uniqueness check
+  if (parsed.data.email !== undefined && parsed.data.email !== existing.email) {
+    const emailTaken = await prisma.user.findUnique({ where: { email: parsed.data.email } });
+    if (emailTaken) {
+      return NextResponse.json({ error: "Cet email est déjà utilisé" }, { status: 409 });
+    }
+    data.email = parsed.data.email;
+  }
+
+  // Password hashing
+  if (parsed.data.password) {
+    data.passwordHash = await bcrypt.hash(parsed.data.password, 12);
+  }
+
   if (parsed.data.nom !== undefined) data.nom = parsed.data.nom ?? null;
   if (parsed.data.prenom !== undefined) data.prenom = parsed.data.prenom ?? null;
   if (parsed.data.profilId !== undefined) data.profilId = parsed.data.profilId ?? null;
   if (parsed.data.active !== undefined) data.active = parsed.data.active;
   if (parsed.data.mobileAccess !== undefined) data.mobileAccess = parsed.data.mobileAccess;
+
+  // Security fields
+  if (parsed.data.failedLoginAttempts !== undefined) data.failedLoginAttempts = parsed.data.failedLoginAttempts;
+  if (parsed.data.lockedUntil !== undefined) data.lockedUntil = parsed.data.lockedUntil;
+  if (parsed.data.mustChangePassword !== undefined) data.mustChangePassword = parsed.data.mustChangePassword;
+
   if (parsed.data.nom !== undefined || parsed.data.prenom !== undefined) {
     const nom = parsed.data.nom ?? existing.nom ?? "";
     const prenom = parsed.data.prenom ?? existing.prenom ?? "";

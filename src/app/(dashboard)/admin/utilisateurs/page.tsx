@@ -38,8 +38,11 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  CheckSquare,
+  Ban,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useSession } from "next-auth/react";
 import { UsersFiltersDropdown, type UsersFiltersState } from "@/components/users/UsersFiltersDropdown";
 import { UsersExportMenu } from "@/components/users/UsersExportMenu";
 import { UserEditDialog } from "@/components/users/UserEditDialog";
@@ -72,6 +75,9 @@ export default function AdminUtilisateursPage() {
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
   const [resetModal, setResetModal] = useState<string | null>(null);
   const [resetPassword, setResetPassword] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const { data: authSession } = useSession();
 
   const buildParams = useCallback(() => {
     const params = new URLSearchParams({ page: String(page), pageSize: "20", sortBy, sortOrder });
@@ -185,6 +191,69 @@ export default function AdminUtilisateursPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === users.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(users.map((u) => u.id));
+    }
+  };
+
+  const bulkAction = async (action: "activate" | "suspend" | "delete") => {
+    const currentUserId = authSession?.user?.id;
+    const targets = action === "delete"
+      ? selectedIds.filter((id) => id !== currentUserId)
+      : selectedIds;
+
+    if (action === "delete" && targets.length < selectedIds.length) {
+      toast.error("Vous ne pouvez pas supprimer votre propre compte");
+      if (targets.length === 0) return;
+    }
+
+    if (action === "delete" && !confirm(`Supprimer ${targets.length} utilisateur(s) ?`)) return;
+
+    setBulkLoading(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const id of targets) {
+      try {
+        if (action === "delete") {
+          const res = await fetch(`/api/users/${id}`, { method: "DELETE" });
+          if (!res.ok) throw new Error();
+        } else {
+          const res = await fetch(`/api/users/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ active: action === "activate" }),
+          });
+          if (!res.ok) throw new Error();
+        }
+        successCount++;
+      } catch {
+        errorCount++;
+      }
+    }
+
+    setBulkLoading(false);
+    setSelectedIds([]);
+    queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+
+    if (successCount > 0) {
+      const label = action === "delete" ? "supprimé(s)" : action === "activate" ? "activé(s)" : "suspendu(s)";
+      toast.success(`${successCount} utilisateur(s) ${label}`);
+    }
+    if (errorCount > 0) {
+      toast.error(`${errorCount} erreur(s) lors de l'opération`);
+    }
+  };
+
   const handleSort = (field: SortField) => {
     if (sortBy === field) {
       setSortOrder((o) => (o === "asc" ? "desc" : "asc"));
@@ -246,9 +315,60 @@ export default function AdminUtilisateursPage() {
             </div>
           ) : (
             <div ref={tableRef}>
+              {selectedIds.length > 0 && (
+                <div className="flex items-center gap-3 mb-3 p-3 bg-muted/50 rounded-lg border">
+                  <CheckSquare className="h-4 w-4 text-emerald-600" />
+                  <span className="text-sm font-medium">{selectedIds.length} sélectionné(s)</span>
+                  <div className="flex gap-2 ml-auto">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => bulkAction("activate")}
+                      disabled={bulkLoading}
+                    >
+                      <UserCheck className="h-4 w-4 mr-1" />
+                      Activer
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => bulkAction("suspend")}
+                      disabled={bulkLoading}
+                    >
+                      <Ban className="h-4 w-4 mr-1" />
+                      Suspendre
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => bulkAction("delete")}
+                      disabled={bulkLoading}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Supprimer
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedIds([])}
+                    >
+                      Annuler
+                    </Button>
+                  </div>
+                </div>
+              )}
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <input
+                        type="checkbox"
+                        checked={users.length > 0 && selectedIds.length === users.length}
+                        onChange={toggleSelectAll}
+                        className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                      />
+                    </TableHead>
                     <TableHead>
                       <button onClick={() => handleSort("email")} className="inline-flex items-center font-medium">
                         Email <SortIcon field="email" />
@@ -280,7 +400,15 @@ export default function AdminUtilisateursPage() {
                 </TableHeader>
                 <TableBody>
                   {users.map((u) => (
-                    <TableRow key={u.id}>
+                    <TableRow key={u.id} className={selectedIds.includes(u.id) ? "bg-muted/30" : ""}>
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(u.id)}
+                          onChange={() => toggleSelect(u.id)}
+                          className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">{u.email}</TableCell>
                       <TableCell>{u.name || `${u.prenom ?? ""} ${u.nom ?? ""}`.trim() || "—"}</TableCell>
                       <TableCell>

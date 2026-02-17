@@ -153,7 +153,7 @@ export function ActivitesTable({
             <TableCell className="text-right">
               {hasActions ? (
                 <DropdownMenu>
-                  <DropdownMenuTrigger>
+                  <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon">
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>

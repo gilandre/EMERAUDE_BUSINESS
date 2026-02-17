@@ -150,6 +150,9 @@ async function main() {
     "decaissements:validate",
     "prefinancements:read",
     "prefinancements:authorize",
+    "activites:read",
+    "activites:create",
+    "activites:update",
     "alertes:read",
     "dashboards:read",
     "dashboards:create",
@@ -181,6 +184,7 @@ async function main() {
     "accomptes:read",
     "accomptes:create",
     "decaissements:read",
+    "activites:read",
     "dashboards:read",
     "rapports:read",
   ];
@@ -369,6 +373,39 @@ async function main() {
   }
 
   console.log("✅ Menus created and assigned to admin");
+
+  // Assign menus to Manager profile (non-admin menus matching permissions)
+  const managerMenuCodes = ["DASHBOARD", "MARCHES", "TRESORERIE", "ACTIVITES", "RAPPORTS"];
+  const managerMenus = allMenus.filter((m) => managerMenuCodes.includes(m.code));
+  for (const menu of managerMenus) {
+    await prisma.profilMenu.upsert({
+      where: { profilId_menuId: { profilId: profilManager.id, menuId: menu.id } },
+      update: {},
+      create: { profilId: profilManager.id, menuId: menu.id },
+    });
+  }
+
+  // Assign menus to User profile (read-only menus)
+  const userMenuCodes = ["DASHBOARD", "MARCHES", "TRESORERIE", "ACTIVITES", "RAPPORTS"];
+  const userMenus = allMenus.filter((m) => userMenuCodes.includes(m.code));
+  for (const menu of userMenus) {
+    await prisma.profilMenu.upsert({
+      where: { profilId_menuId: { profilId: profilUser.id, menuId: menu.id } },
+      update: {},
+      create: { profilId: profilUser.id, menuId: menu.id },
+    });
+  }
+
+  console.log("✅ Menus assigned to Manager and User profiles");
+
+  // Invalidate menus cache to reflect new assignments
+  try {
+    const { cacheDelByPrefix } = await import("@/lib/cache");
+    await cacheDelByPrefix("menus");
+    console.log("✅ Menus cache invalidated");
+  } catch {
+    // ignore if Redis unavailable
+  }
 
   // ═══════════════════════════════════════════
   // 6. RÈGLES D'ALERTES TEMPLATES

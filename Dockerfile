@@ -23,11 +23,12 @@ RUN npx prisma generate
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-# ─── Migrator (pour prisma migrate deploy) ─────────────────────────────────
+# ─── Migrator (prisma migrate deploy + db seed) ──────────────────────────────
 FROM base AS migrator
 COPY --from=deps /app/node_modules ./node_modules
 COPY prisma ./prisma
-CMD ["npx", "prisma", "migrate", "deploy"]
+COPY package.json ./
+CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed"]
 
 # ─── Runner (image finale) ─────────────────────────────────────────────────
 FROM base AS runner

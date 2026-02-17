@@ -1,7 +1,9 @@
 import * as SecureStore from 'expo-secure-store';
 
-// API sur port 3001 quand séparée, sinon 3000 (unifié)
-export const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3001';
+// API unifiée Next.js sur port 3000
+// Émulateur Android AVD: 10.0.2.2 redirige vers localhost de la machine hôte
+// Appareil physique: utiliser l'IP locale du PC via EXPO_PUBLIC_API_URL
+export const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000';
 
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'auth_user';

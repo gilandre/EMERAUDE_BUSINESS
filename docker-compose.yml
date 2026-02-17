@@ -5,7 +5,8 @@
 
 services:
   app1:
-    image: ghcr.io/gilandre/emeraude-business:latest
+    build: .
+    image: emeraude-business-app
     container_name: emeraude-app1
     restart: unless-stopped
     env_file: .env
@@ -21,7 +22,7 @@ services:
     networks: [backend]
 
   app2:
-    image: ghcr.io/gilandre/emeraude-business:latest
+    image: emeraude-business-app
     container_name: emeraude-app2
     restart: unless-stopped
     env_file: .env
@@ -37,7 +38,7 @@ services:
     networks: [backend]
 
   app3:
-    image: ghcr.io/gilandre/emeraude-business:latest
+    image: emeraude-business-app
     container_name: emeraude-app3
     restart: unless-stopped
     env_file: .env

@@ -123,7 +123,7 @@ const nextConfig: NextConfig = {
   compiler: {
     removeConsole: process.env.NODE_ENV === "production" ? { exclude: ["error", "warn"] } : false,
   },
-  serverExternalPackages: ["jose", "ioredis", "bullmq", "sonner"],
+  serverExternalPackages: ["jose", "ioredis", "bullmq", "sonner", "@opentelemetry/instrumentation", "@opentelemetry/api", "@prisma/instrumentation"],
   webpack: (config) => {
     return config;
   },

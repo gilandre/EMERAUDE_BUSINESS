@@ -21,13 +21,17 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { MouvementForm } from "@/components/activites/MouvementForm";
 import { MontantDisplay } from "@/components/devises/MontantDisplay";
 import { toast } from "sonner";
-import { Trash2, ArrowUpCircle, ArrowDownCircle, ChevronDown, ChevronRight } from "lucide-react";
+import { Trash2, Pencil, ArrowUpCircle, ArrowDownCircle, ChevronDown, ChevronRight } from "lucide-react";
 
 interface MouvementsListProps {
   activiteId: string;
   deviseCode: string;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 interface Mouvement {
@@ -47,13 +51,14 @@ interface Mouvement {
 
 const PAGE_SIZES = [10, 20, 50];
 
-export function MouvementsList({ activiteId, deviseCode }: MouvementsListProps) {
+export function MouvementsList({ activiteId, deviseCode, canEdit = true, canDelete = true }: MouvementsListProps) {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [sensFilter, setSensFilter] = useState<string>("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<Mouvement | null>(null);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["mouvements", activiteId, page, pageSize, sensFilter],
@@ -118,6 +123,36 @@ export function MouvementsList({ activiteId, deviseCode }: MouvementsListProps) 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editTarget} onOpenChange={(open) => { if (!open) setEditTarget(null); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>Modifier le mouvement</DialogTitle>
+          </DialogHeader>
+          {editTarget && (
+            <MouvementForm
+              activiteId={activiteId}
+              deviseCode={deviseCode}
+              mode="edit"
+              mouvementId={editTarget.id}
+              initialData={{
+                sens: editTarget.sens,
+                montant: editTarget.montant,
+                dateMouvement: editTarget.dateMouvement,
+                categorie: editTarget.categorie,
+                reference: editTarget.reference,
+                description: editTarget.description,
+                motif: editTarget.motif,
+                beneficiaire: editTarget.beneficiaire,
+                modePaiement: editTarget.modePaiement,
+              }}
+              onSuccess={() => setEditTarget(null)}
+              onCancel={() => setEditTarget(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium">Filtrer:</span>
@@ -204,14 +239,25 @@ export function MouvementsList({ activiteId, deviseCode }: MouvementsListProps) 
                           {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                         </Button>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => { e.stopPropagation(); setDeleteTargetId(m.id); }}
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      {canEdit && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => { e.stopPropagation(); setEditTarget(m); }}
+                        >
+                          <Pencil className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      )}
+                      {canDelete && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => { e.stopPropagation(); setDeleteTargetId(m.id); }}
+                          disabled={deleteMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                   {hasDetails && isExpanded && (

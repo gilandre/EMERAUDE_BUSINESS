@@ -3,9 +3,12 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
+import { createPortal } from "react-dom";
+
 const DropdownMenuContext = React.createContext<{
   open: boolean;
   setOpen: (v: boolean) => void;
+  triggerRef: React.RefObject<HTMLElement | null>;
 } | null>(null);
 
 interface DropdownMenuProps {
@@ -16,6 +19,7 @@ interface DropdownMenuProps {
 
 const DropdownMenu = ({ children, open: controlledOpen, onOpenChange }: DropdownMenuProps) => {
   const [internalOpen, setInternalOpen] = React.useState(false);
+  const triggerRef = React.useRef<HTMLElement | null>(null);
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : internalOpen;
   const setOpen = React.useCallback(
@@ -26,7 +30,7 @@ const DropdownMenu = ({ children, open: controlledOpen, onOpenChange }: Dropdown
     [isControlled, onOpenChange]
   );
   return (
-    <DropdownMenuContext.Provider value={{ open, setOpen }}>
+    <DropdownMenuContext.Provider value={{ open, setOpen, triggerRef }}>
       <div className="relative inline-block">{children}</div>
     </DropdownMenuContext.Provider>
   );
@@ -37,6 +41,18 @@ const DropdownMenuTrigger = React.forwardRef<
   React.ButtonHTMLAttributes<HTMLButtonElement> & { asChild?: boolean }
 >(function DropdownMenuTrigger({ children, asChild, onClick, ...props }, ref) {
   const ctx = React.useContext(DropdownMenuContext);
+  const internalRef = React.useRef<HTMLButtonElement>(null);
+
+  const setRefs = React.useCallback(
+    (node: HTMLButtonElement | null) => {
+      (internalRef as React.MutableRefObject<HTMLButtonElement | null>).current = node;
+      if (ctx) (ctx.triggerRef as React.MutableRefObject<HTMLElement | null>).current = node;
+      if (typeof ref === "function") ref(node);
+      else if (ref) (ref as React.MutableRefObject<HTMLButtonElement | null>).current = node;
+    },
+    [ref, ctx]
+  );
+
   if (!ctx) return null;
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     ctx.setOpen(!ctx.open);
@@ -44,12 +60,12 @@ const DropdownMenuTrigger = React.forwardRef<
   };
   if (asChild && React.isValidElement(children)) {
     return React.cloneElement(children as React.ReactElement, {
-      ref,
+      ref: setRefs,
       onClick: handleClick,
     } as Record<string, unknown>);
   }
   return (
-    <button ref={ref} type="button" onClick={handleClick} {...props}>
+    <button ref={setRefs} type="button" onClick={handleClick} {...props}>
       {children}
     </button>
   );
@@ -61,35 +77,49 @@ const DropdownMenuContent = React.forwardRef<
 >(function DropdownMenuContent({ className, children, ...props }, ref) {
   const ctx = React.useContext(DropdownMenuContext);
   const divRef = React.useRef<HTMLDivElement>(null);
+  const [pos, setPos] = React.useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
   React.useEffect(() => {
     if (!ctx?.open) return;
+
+    // Position relative to trigger
+    if (ctx.triggerRef.current) {
+      const rect = ctx.triggerRef.current.getBoundingClientRect();
+      setPos({ top: rect.bottom + 4, left: rect.right });
+    }
+
     const handler = (e: MouseEvent) => {
-      if (divRef.current && !divRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        divRef.current && !divRef.current.contains(target) &&
+        ctx.triggerRef.current && !ctx.triggerRef.current.contains(target)
+      ) {
         ctx.setOpen(false);
       }
     };
     document.addEventListener("click", handler);
     return () => document.removeEventListener("click", handler);
-  }, [ctx?.open]);
+  }, [ctx?.open, ctx]);
 
   if (!ctx?.open) return null;
 
-  return (
+  return createPortal(
     <div
       ref={(node) => {
         (divRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
         if (typeof ref === "function") ref(node);
         else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
       }}
+      style={{ position: "fixed", top: pos.top, left: pos.left, transform: "translateX(-100%)" }}
       className={cn(
-        "absolute right-0 top-full z-50 mt-1 min-w-[8rem] overflow-hidden rounded-md border border-border bg-card p-1 shadow-md",
+        "z-50 min-w-[8rem] overflow-hidden rounded-md border border-border bg-card p-1 shadow-md",
         className
       )}
       {...props}
     >
       {children}
-    </div>
+    </div>,
+    document.body
   );
 });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,22 +27,65 @@ const MODE_PAIEMENT_OPTIONS = [
 interface MouvementFormProps {
   activiteId: string;
   deviseCode: string;
+  mode?: "create" | "edit";
+  mouvementId?: string;
+  initialData?: {
+    sens: string;
+    montant: number;
+    dateMouvement: string;
+    categorie?: string | null;
+    reference?: string | null;
+    description?: string | null;
+    motif?: string | null;
+    beneficiaire?: string | null;
+    modePaiement?: string | null;
+  };
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }
 
-export function MouvementForm({ activiteId, deviseCode }: MouvementFormProps) {
+const EMPTY_FORM = {
+  sens: "ENTREE",
+  montant: "",
+  dateMouvement: new Date().toISOString().slice(0, 10),
+  categorie: "",
+  reference: "",
+  description: "",
+  motif: "",
+  beneficiaire: "",
+  modePaiement: "",
+};
+
+export function MouvementForm({
+  activiteId,
+  deviseCode,
+  mode = "create",
+  mouvementId,
+  initialData,
+  onSuccess,
+  onCancel,
+}: MouvementFormProps) {
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({
-    sens: "ENTREE",
-    montant: "",
-    dateMouvement: new Date().toISOString().slice(0, 10),
-    categorie: "",
-    reference: "",
-    description: "",
-    motif: "",
-    beneficiaire: "",
-    modePaiement: "",
-  });
+  const [open, setOpen] = useState(mode === "edit");
+  const [form, setForm] = useState(EMPTY_FORM);
+
+  useEffect(() => {
+    if (mode === "edit" && initialData) {
+      setForm({
+        sens: initialData.sens,
+        montant: String(initialData.montant),
+        dateMouvement: initialData.dateMouvement
+          ? String(initialData.dateMouvement).slice(0, 10)
+          : new Date().toISOString().slice(0, 10),
+        categorie: initialData.categorie ?? "",
+        reference: initialData.reference ?? "",
+        description: initialData.description ?? "",
+        motif: initialData.motif ?? "",
+        beneficiaire: initialData.beneficiaire ?? "",
+        modePaiement: initialData.modePaiement ?? "",
+      });
+    }
+  }, [mode, initialData]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -57,39 +100,40 @@ export function MouvementForm({ activiteId, deviseCode }: MouvementFormProps) {
         beneficiaire: form.beneficiaire || undefined,
         modePaiement: form.modePaiement || undefined,
       };
-      const res = await fetch(`/api/activites/${activiteId}/mouvements`, {
-        method: "POST",
+
+      const isEdit = mode === "edit" && mouvementId;
+      const url = isEdit
+        ? `/api/activites/${activiteId}/mouvements/${mouvementId}`
+        : `/api/activites/${activiteId}/mouvements`;
+      const method = isEdit ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "Erreur lors de l'ajout");
+      if (!res.ok) throw new Error(data.error ?? (isEdit ? "Erreur lors de la modification" : "Erreur lors de l'ajout"));
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["activite", activiteId] });
       queryClient.invalidateQueries({ queryKey: ["mouvements", activiteId] });
       queryClient.invalidateQueries({ queryKey: ["activites"] });
-      toast.success("Mouvement ajouté");
-      setForm({
-        sens: "ENTREE",
-        montant: "",
-        dateMouvement: new Date().toISOString().slice(0, 10),
-        categorie: "",
-        reference: "",
-        description: "",
-        motif: "",
-        beneficiaire: "",
-        modePaiement: "",
-      });
-      setOpen(false);
+      toast.success(mode === "edit" ? "Mouvement modifié" : "Mouvement ajouté");
+      if (mode === "create") {
+        setForm(EMPTY_FORM);
+        setOpen(false);
+      }
+      onSuccess?.();
     },
     onError: (err: Error) => toast.error(err.message),
   });
 
   const deviseSym = deviseCode === "XOF" ? "FCFA" : deviseCode;
+  const isEdit = mode === "edit";
 
-  if (!open) {
+  if (!open && !isEdit) {
     return (
       <Button onClick={() => setOpen(true)} className="w-full">
         <Plus className="h-4 w-4 mr-2" />
@@ -101,7 +145,9 @@ export function MouvementForm({ activiteId, deviseCode }: MouvementFormProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Nouveau mouvement</CardTitle>
+        <CardTitle className="text-base">
+          {isEdit ? "Modifier le mouvement" : "Nouveau mouvement"}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <form
@@ -199,9 +245,21 @@ export function MouvementForm({ activiteId, deviseCode }: MouvementFormProps) {
 
           <div className="flex gap-2">
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? "Ajout..." : "Ajouter"}
+              {mutation.isPending
+                ? (isEdit ? "Enregistrement..." : "Ajout...")
+                : (isEdit ? "Enregistrer" : "Ajouter")}
             </Button>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                if (isEdit) {
+                  onCancel?.();
+                } else {
+                  setOpen(false);
+                }
+              }}
+            >
               Annuler
             </Button>
           </div>

@@ -11,8 +11,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { MontantDisplay } from "@/components/devises/MontantDisplay";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Eye, Edit, Archive, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { TYPE_COLORS, STATUT_COLORS } from "@/lib/activite-constants";
 
@@ -41,6 +47,11 @@ interface ActivitesTableProps {
   sortBy: string;
   sortOrder: "asc" | "desc";
   onSort: (col: string) => void;
+  canUpdate?: boolean;
+  canDelete?: boolean;
+  onEdit?: (activite: ActiviteRow) => void;
+  onCloturer?: (activite: ActiviteRow) => void;
+  onDelete?: (activite: ActiviteRow) => void;
 }
 
 function SoldeDot({ solde }: { solde: number }) {
@@ -57,8 +68,14 @@ export function ActivitesTable({
   sortBy,
   sortOrder,
   onSort,
+  canUpdate = false,
+  canDelete = false,
+  onEdit,
+  onCloturer,
+  onDelete,
 }: ActivitesTableProps) {
   const allSelected = items.length > 0 && selectedIds.length === items.length;
+  const hasActions = canUpdate || canDelete;
 
   const SortHead = ({ col, label }: { col: string; label: string }) => (
     <TableHead
@@ -134,11 +151,43 @@ export function ActivitesTable({
               )}
             </TableCell>
             <TableCell className="text-right">
-              <Link href={`/activites/${a.id}`}>
-                <Button variant="ghost" size="icon">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </Link>
+              {hasActions ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger>
+                    <Button variant="ghost" size="icon">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem asChild>
+                      <Link href={`/activites/${a.id}`} className="flex items-center gap-2">
+                        <Eye className="h-4 w-4" /> Voir
+                      </Link>
+                    </DropdownMenuItem>
+                    {canUpdate && (
+                      <DropdownMenuItem onClick={() => onEdit?.(a)} className="flex items-center gap-2">
+                        <Edit className="h-4 w-4" /> Modifier
+                      </DropdownMenuItem>
+                    )}
+                    {canUpdate && a.statut === "ACTIVE" && (
+                      <DropdownMenuItem onClick={() => onCloturer?.(a)} className="flex items-center gap-2">
+                        <Archive className="h-4 w-4" /> Clôturer
+                      </DropdownMenuItem>
+                    )}
+                    {canDelete && (
+                      <DropdownMenuItem onClick={() => onDelete?.(a)} className="flex items-center gap-2 text-destructive">
+                        <Trash2 className="h-4 w-4" /> Supprimer
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Link href={`/activites/${a.id}`}>
+                  <Button variant="ghost" size="icon">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </Link>
+              )}
             </TableCell>
           </TableRow>
         ))}

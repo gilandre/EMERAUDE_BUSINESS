@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ArrowLeft, Edit, Trash2, Archive, TrendingUp, TrendingDown, Wallet } from "lucide-react";
 import { TYPE_COLORS, STATUT_COLORS } from "@/lib/activite-constants";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const MouvementsList = dynamic(
   () => import("@/components/activites/MouvementsList").then((m) => ({ default: m.MouvementsList })),
@@ -81,6 +82,17 @@ export default function ActiviteDetailPage() {
     enabled: !!id,
     retry: 1,
   });
+
+  const { data: permsData } = useQuery({
+    queryKey: ["my-permissions"],
+    queryFn: async () => {
+      const res = await fetch("/api/users/me/permissions");
+      if (!res.ok) return { permissions: [] };
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  const perms = usePermissions((permsData?.permissions ?? []) as string[]);
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -212,17 +224,21 @@ export default function ActiviteDetailPage() {
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
-            <Edit className="h-4 w-4 mr-1" /> Modifier
-          </Button>
-          {activite.statut === "ACTIVE" && (
+          {perms.has("activites:update") && (
+            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+              <Edit className="h-4 w-4 mr-1" /> Modifier
+            </Button>
+          )}
+          {perms.has("activites:update") && activite.statut === "ACTIVE" && (
             <Button variant="outline" size="sm" onClick={() => setConfirmAction("cloturer")}>
               <Archive className="h-4 w-4 mr-1" /> Clôturer
             </Button>
           )}
-          <Button variant="destructive" size="sm" onClick={() => setConfirmAction("delete")} disabled={isPending}>
-            <Trash2 className="h-4 w-4 mr-1" /> Supprimer
-          </Button>
+          {perms.has("activites:delete") && (
+            <Button variant="destructive" size="sm" onClick={() => setConfirmAction("delete")} disabled={isPending}>
+              <Trash2 className="h-4 w-4 mr-1" /> Supprimer
+            </Button>
+          )}
         </div>
       </div>
 
@@ -327,7 +343,7 @@ export default function ActiviteDetailPage() {
         </TabsList>
 
         <TabsContent value="mouvements" className="mt-4 space-y-4">
-          {activite.statut === "ACTIVE" && (
+          {activite.statut === "ACTIVE" && perms.has("activites:create") && (
             <MouvementForm activiteId={id} deviseCode={deviseCode} />
           )}
           {activite.statut !== "ACTIVE" && (
@@ -335,7 +351,12 @@ export default function ActiviteDetailPage() {
               Cette activité est {activite.statut === "CLOTUREE" ? "clôturée" : "archivée"}. Aucun mouvement ne peut être ajouté.
             </p>
           )}
-          <MouvementsList activiteId={id} deviseCode={deviseCode} />
+          <MouvementsList
+            activiteId={id}
+            deviseCode={deviseCode}
+            canEdit={perms.has("activites:update")}
+            canDelete={perms.has("activites:delete")}
+          />
         </TabsContent>
 
         <TabsContent value="statistiques" className="mt-4">

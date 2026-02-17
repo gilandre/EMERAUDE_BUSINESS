@@ -2,15 +2,47 @@
 
 import { useRef, useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+} from "@/components/ui/alert-dialog";
 import { ActivitesFiltersDropdown, type ActivitesFiltersState } from "@/components/activites/ActivitesFiltersDropdown";
 import { ActivitesExportMenu } from "@/components/activites/ActivitesExportMenu";
 import { ActivitesTable } from "@/components/activites/ActivitesTable";
+import { ActiviteForm } from "@/components/activites/ActiviteForm";
 import { usePermissions } from "@/hooks/usePermissions";
+
+interface ActiviteRow {
+  id: string;
+  code: string;
+  libelle: string;
+  description?: string;
+  type: string;
+  statut: string;
+  deviseCode: string;
+  totalEntrees: number;
+  totalSorties: number;
+  solde: number;
+  soldeXOF: number;
+  budgetPrevisionnel?: number | null;
+  dateDebut?: string | null;
+  dateFin?: string | null;
+  responsable?: { id: string; name: string | null; email: string } | null;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { mouvements: number };
+}
 
 function buildParams(
   page: number,
@@ -87,6 +119,10 @@ export default function ActivitesListPage() {
   });
   const [filtersApplied, setFiltersApplied] = useState(filters);
 
+  // Action states
+  const [editTarget, setEditTarget] = useState<ActiviteRow | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ type: "delete" | "cloturer"; activite: ActiviteRow } | null>(null);
+
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (filtersApplied.type.length) count++;
@@ -133,6 +169,45 @@ export default function ActivitesListPage() {
     }
   }, [data, page, pageSize, q, filtersApplied, sortBy, sortOrder, queryClient]);
 
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/activites/${id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Erreur lors de la suppression");
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["activites"] });
+      toast.success("Activité supprimée");
+      setConfirmAction(null);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message);
+      setConfirmAction(null);
+    },
+  });
+
+  const cloturerMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/activites/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ statut: "CLOTUREE" }),
+      });
+      if (!res.ok) throw new Error("Erreur lors de la clôture");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["activites"] });
+      toast.success("Activité clôturée");
+      setConfirmAction(null);
+    },
+    onError: () => {
+      toast.error("Erreur lors de la clôture");
+      setConfirmAction(null);
+    },
+  });
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setQ(searchInput);
@@ -164,19 +239,88 @@ export default function ActivitesListPage() {
     setSelectedIds(checked ? (data?.data ?? []).map((a: { id: string }) => a.id) : []);
   };
 
-  const items = data?.data ?? [];
+  const items: ActiviteRow[] = data?.data ?? [];
   const total = data?.total ?? 0;
   const totalPages = data?.totalPages ?? 0;
+  const isPending = deleteMutation.isPending || cloturerMutation.isPending;
 
   return (
     <div ref={containerRef} className="space-y-6">
+      {/* Confirm Delete / Clôturer AlertDialog */}
+      <AlertDialog open={!!confirmAction} onOpenChange={(open) => { if (!open) setConfirmAction(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmAction?.type === "delete"
+                ? "Supprimer cette activité ?"
+                : "Clôturer cette activité ?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmAction?.type === "delete"
+                ? `L'activité "${confirmAction.activite.libelle}" et tous ses mouvements seront définitivement supprimés.`
+                : `Une fois clôturée, aucun mouvement ne pourra plus être ajouté à l'activité "${confirmAction?.activite.libelle}".`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="outline" onClick={() => setConfirmAction(null)} disabled={isPending}>
+              Annuler
+            </Button>
+            <Button
+              variant={confirmAction?.type === "delete" ? "destructive" : "default"}
+              onClick={() => {
+                if (!confirmAction) return;
+                if (confirmAction.type === "delete") deleteMutation.mutate(confirmAction.activite.id);
+                else cloturerMutation.mutate(confirmAction.activite.id);
+              }}
+              disabled={isPending}
+            >
+              {isPending
+                ? "En cours..."
+                : confirmAction?.type === "delete"
+                  ? "Supprimer"
+                  : "Clôturer"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editTarget} onOpenChange={(open) => { if (!open) setEditTarget(null); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>Modifier l&apos;activité</DialogTitle>
+          </DialogHeader>
+          {editTarget && (
+            <ActiviteForm
+              mode="edit"
+              activiteId={editTarget.id}
+              initialData={{
+                libelle: editTarget.libelle,
+                description: editTarget.description,
+                type: editTarget.type,
+                statut: editTarget.statut,
+                deviseCode: editTarget.deviseCode,
+                budgetPrevisionnel: editTarget.budgetPrevisionnel,
+                dateDebut: editTarget.dateDebut ? String(editTarget.dateDebut).slice(0, 10) : null,
+                dateFin: editTarget.dateFin ? String(editTarget.dateFin).slice(0, 10) : null,
+                responsableId: editTarget.responsable?.id ?? null,
+              }}
+              onSuccess={() => setEditTarget(null)}
+              onCancel={() => setEditTarget(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-3xl font-bold flex items-center gap-2">
           Activités ({total})
         </h1>
-        <Link href="/activites/nouvelle">
-          <Button>+ Nouvelle Activité</Button>
-        </Link>
+        {perms.has("activites:create") && (
+          <Link href="/activites/nouvelle">
+            <Button>+ Nouvelle Activité</Button>
+          </Link>
+        )}
       </div>
 
       <Card>
@@ -231,9 +375,11 @@ export default function ActivitesListPage() {
           ) : items.length === 0 ? (
             <div className="py-12 text-center">
               <p className="text-muted-foreground">Aucune activité</p>
-              <Link href="/activites/nouvelle" className="mt-2 inline-block">
-                <Button variant="outline" size="sm">Créer une activité</Button>
-              </Link>
+              {perms.has("activites:create") && (
+                <Link href="/activites/nouvelle" className="mt-2 inline-block">
+                  <Button variant="outline" size="sm">Créer une activité</Button>
+                </Link>
+              )}
             </div>
           ) : (
             <ActivitesTable
@@ -244,6 +390,11 @@ export default function ActivitesListPage() {
               sortBy={sortBy}
               sortOrder={sortOrder}
               onSort={handleSort}
+              canUpdate={perms.has("activites:update")}
+              canDelete={perms.has("activites:delete")}
+              onEdit={(a) => setEditTarget(a)}
+              onCloturer={(a) => setConfirmAction({ type: "cloturer", activite: a })}
+              onDelete={(a) => setConfirmAction({ type: "delete", activite: a })}
             />
           )}
 

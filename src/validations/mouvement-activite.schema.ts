@@ -17,3 +17,18 @@ export const createMouvementSchema = z.object({
 });
 
 export type CreateMouvementInput = z.infer<typeof createMouvementSchema>;
+
+export const updateMouvementSchema = z.object({
+  sens: z.enum(SENS_MOUVEMENT).optional(),
+  montant: z.number().min(0.01, "Montant requis et > 0").optional(),
+  dateMouvement: z.string().min(1, "Date requise").optional(),
+  categorie: z.string().nullable().optional(),
+  reference: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  motif: z.string().nullable().optional(),
+  beneficiaire: z.string().nullable().optional(),
+  beneficiaireId: z.string().nullable().optional(),
+  modePaiement: z.enum(MODES_PAIEMENT_MVT).nullable().optional(),
+});
+
+export type UpdateMouvementInput = z.infer<typeof updateMouvementSchema>;

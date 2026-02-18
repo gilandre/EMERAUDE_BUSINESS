@@ -15,7 +15,7 @@ EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 -- CreateTable
-CREATE TABLE "activites" (
+CREATE TABLE IF NOT EXISTS "activites" (
     "id" TEXT NOT NULL,
     "code" TEXT NOT NULL,
     "libelle" TEXT NOT NULL,
@@ -43,7 +43,7 @@ CREATE TABLE "activites" (
 );
 
 -- CreateTable
-CREATE TABLE "mouvements_activite" (
+CREATE TABLE IF NOT EXISTS "mouvements_activite" (
     "id" TEXT NOT NULL,
     "activite_id" TEXT NOT NULL,
     "sens" "SensMouvement" NOT NULL,
@@ -64,44 +64,40 @@ CREATE TABLE "mouvements_activite" (
     CONSTRAINT "mouvements_activite_pkey" PRIMARY KEY ("id")
 );
 
--- CreateIndex
-CREATE UNIQUE INDEX "activites_code_key" ON "activites"("code");
+-- CreateIndex (IF NOT EXISTS)
+CREATE UNIQUE INDEX IF NOT EXISTS "activites_code_key" ON "activites"("code");
+CREATE INDEX IF NOT EXISTS "activites_statut_idx" ON "activites"("statut");
+CREATE INDEX IF NOT EXISTS "activites_type_idx" ON "activites"("type");
+CREATE INDEX IF NOT EXISTS "activites_updated_at_idx" ON "activites"("updated_at" DESC);
+CREATE INDEX IF NOT EXISTS "activites_devise_id_idx" ON "activites"("devise_id");
+CREATE INDEX IF NOT EXISTS "activites_responsable_id_idx" ON "activites"("responsable_id");
 
--- CreateIndex
-CREATE INDEX "activites_statut_idx" ON "activites"("statut");
+CREATE INDEX IF NOT EXISTS "mouvements_activite_activite_id_idx" ON "mouvements_activite"("activite_id");
+CREATE INDEX IF NOT EXISTS "mouvements_activite_date_mouvement_idx" ON "mouvements_activite"("date_mouvement" DESC);
+CREATE INDEX IF NOT EXISTS "mouvements_activite_sens_idx" ON "mouvements_activite"("sens");
+CREATE INDEX IF NOT EXISTS "mouvements_activite_beneficiaire_id_idx" ON "mouvements_activite"("beneficiaire_id");
 
--- CreateIndex
-CREATE INDEX "activites_type_idx" ON "activites"("type");
+-- AddForeignKey (use mapped table names: "devises" not "Devise")
+DO $$ BEGIN
+  ALTER TABLE "activites" ADD CONSTRAINT "activites_devise_id_fkey"
+    FOREIGN KEY ("devise_id") REFERENCES "devises"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
--- CreateIndex
-CREATE INDEX "activites_updated_at_idx" ON "activites"("updated_at" DESC);
+DO $$ BEGIN
+  ALTER TABLE "activites" ADD CONSTRAINT "activites_responsable_id_fkey"
+    FOREIGN KEY ("responsable_id") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
--- CreateIndex
-CREATE INDEX "activites_devise_id_idx" ON "activites"("devise_id");
+DO $$ BEGIN
+  ALTER TABLE "mouvements_activite" ADD CONSTRAINT "mouvements_activite_activite_id_fkey"
+    FOREIGN KEY ("activite_id") REFERENCES "activites"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
--- CreateIndex
-CREATE INDEX "activites_responsable_id_idx" ON "activites"("responsable_id");
-
--- CreateIndex
-CREATE INDEX "mouvements_activite_activite_id_idx" ON "mouvements_activite"("activite_id");
-
--- CreateIndex
-CREATE INDEX "mouvements_activite_date_mouvement_idx" ON "mouvements_activite"("date_mouvement" DESC);
-
--- CreateIndex
-CREATE INDEX "mouvements_activite_sens_idx" ON "mouvements_activite"("sens");
-
--- CreateIndex
-CREATE INDEX "mouvements_activite_beneficiaire_id_idx" ON "mouvements_activite"("beneficiaire_id");
-
--- AddForeignKey
-ALTER TABLE "activites" ADD CONSTRAINT "activites_devise_id_fkey" FOREIGN KEY ("devise_id") REFERENCES "Devise"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "activites" ADD CONSTRAINT "activites_responsable_id_fkey" FOREIGN KEY ("responsable_id") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "mouvements_activite" ADD CONSTRAINT "mouvements_activite_activite_id_fkey" FOREIGN KEY ("activite_id") REFERENCES "activites"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey (optional: beneficiaire reference)
-ALTER TABLE "mouvements_activite" ADD CONSTRAINT "mouvements_activite_beneficiaire_id_fkey" FOREIGN KEY ("beneficiaire_id") REFERENCES "Beneficiaire"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "mouvements_activite" ADD CONSTRAINT "mouvements_activite_beneficiaire_id_fkey"
+    FOREIGN KEY ("beneficiaire_id") REFERENCES "Beneficiaire"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;

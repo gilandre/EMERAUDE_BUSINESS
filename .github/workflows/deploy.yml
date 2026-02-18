@@ -118,9 +118,18 @@ jobs:
             docker pull "$IMAGE"
             docker pull "$MIGRATOR"
 
-            echo "==> Running Prisma migrations..."
+            DB_URL="postgresql://${POSTGRES_USER:-emeraude}:${POSTGRES_PASSWORD:-emeraude}@emeraude-postgres:5432/${POSTGRES_DB:-emeraude}"
+
+            echo "==> Resolving any failed migrations..."
             docker run --rm --network emeraude_business_backend \
-              -e DATABASE_URL="postgresql://${POSTGRES_USER:-emeraude}:${POSTGRES_PASSWORD:-emeraude}@emeraude-postgres:5432/${POSTGRES_DB:-emeraude}" \
+              -e DATABASE_URL="$DB_URL" \
+              "$MIGRATOR" sh -c '
+                npx prisma migrate resolve --rolled-back 20260218000000_add_activites_module 2>/dev/null || true
+              '
+
+            echo "==> Running Prisma migrations + seed..."
+            docker run --rm --network emeraude_business_backend \
+              -e DATABASE_URL="$DB_URL" \
               "$MIGRATOR"
 
             echo "==> Stopping removed instances..."

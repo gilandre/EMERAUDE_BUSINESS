@@ -274,9 +274,9 @@ async function main() {
     },
   });
 
-  await prisma.menu.upsert({
+  const menuActivites = await prisma.menu.upsert({
     where: { code: "ACTIVITES" },
-    update: {},
+    update: { path: "/activites", icon: "FolderOpen", ordre: 3, active: true, permission: "activites:read", parentId: null },
     create: {
       code: "ACTIVITES",
       libelle: "Activités",
@@ -287,6 +287,10 @@ async function main() {
       permission: "activites:read",
     },
   });
+
+  // Remove any stale child menus under ACTIVITES (it should be a flat menu, not a parent)
+  await prisma.profilMenu.deleteMany({ where: { menu: { parentId: menuActivites.id } } });
+  await prisma.menu.deleteMany({ where: { parentId: menuActivites.id } });
 
   const menuTresorerie = await prisma.menu.upsert({
     where: { code: "TRESORERIE" },

@@ -528,6 +528,8 @@ async function main() {
     { code: "RAPPORT_PREFINANCEMENTS", libelle: "Rapport Préfinancements", type: "préfinancement" },
     { code: "RAPPORT_ALERTES_DECLENCHEES", libelle: "Rapport Alertes Déclenchées", type: "alertes" },
     { code: "RAPPORT_AUDIT_UTILISATEURS", libelle: "Rapport Audit Utilisateurs", type: "audit" },
+    { code: "RAPPORT_ACTIVITES", libelle: "Rapport Activités", type: "activités" },
+    { code: "RAPPORT_MOUVEMENTS_ACTIVITES", libelle: "Rapport Mouvements Activités", type: "flux-activités" },
   ];
 
   for (const r of rapportTemplates) {

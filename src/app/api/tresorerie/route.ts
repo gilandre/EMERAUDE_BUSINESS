@@ -65,6 +65,8 @@ async function getHandler(req: Request, _ctx: RouteContext) {
     accomptes,
     decaissements,
     marches,
+    activitesAggregate,
+    mouvementsActivitesRaw,
   ] = await Promise.all([
     prisma.accompte.aggregate({ _sum: { montantXOF: true } }),
     prisma.decaissement.aggregate({ _sum: { montantXOF: true } }),
@@ -126,6 +128,19 @@ async function getHandler(req: Request, _ctx: RouteContext) {
         accomptes: { select: { montantXOF: true } },
         decaissements: { select: { montantXOF: true } },
         prefinancement: { select: { montant: true, montantUtilise: true } },
+      },
+    }),
+    // Activités — solde global
+    prisma.activite.aggregate({
+      _sum: { totalEntreesXOF: true, totalSortiesXOF: true, soldeXOF: true },
+    }),
+    // Mouvements activités de la période
+    prisma.mouvementActivite.findMany({
+      where: { dateMouvement: { gte: start, lte: end } },
+      take: 100,
+      orderBy: { dateMouvement: "desc" },
+      include: {
+        activite: { select: { code: true, libelle: true, deviseCode: true } },
       },
     }),
   ]);
@@ -224,6 +239,28 @@ async function getHandler(req: Request, _ctx: RouteContext) {
     evolution,
     mouvements,
     byMarche,
+    activites: {
+      totalEntrees: Number(activitesAggregate._sum.totalEntreesXOF ?? 0),
+      totalSorties: Number(activitesAggregate._sum.totalSortiesXOF ?? 0),
+      solde: Number(activitesAggregate._sum.soldeXOF ?? 0),
+    },
+    mouvementsActivites: mouvementsActivitesRaw.map((mv) => ({
+      id: mv.id,
+      type: mv.sens,
+      activiteId: mv.activiteId,
+      activiteCode: mv.activite.code,
+      activiteLibelle: mv.activite.libelle,
+      deviseCode: mv.activite.deviseCode,
+      montant: Number(mv.montant),
+      montantXOF: Number(mv.montantXOF),
+      date: mv.dateMouvement,
+      reference: mv.reference,
+      description: mv.description,
+      categorie: mv.categorie,
+      beneficiaire: mv.beneficiaire,
+      motif: mv.motif,
+      modePaiement: mv.modePaiement,
+    })),
     conversionRates: {
       EUR: Number(tauxEUR.toString()),
       USD: Number(tauxUSD.toString()),

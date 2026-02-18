@@ -32,6 +32,29 @@ export const DEVISE_LABELS: Record<string, string> = {
   GBP: "GBP (Livre)",
 };
 
+// ── Type d'activité ──────────────────────────────────────
+export const TYPE_ACTIVITE_LABELS: Record<string, string> = {
+  MISSION: "Mission",
+  EVENEMENT: "Événement",
+  PROJET: "Projet",
+  FORMATION: "Formation",
+  FONCTIONNEMENT: "Fonctionnement",
+  AUTRE: "Autre",
+};
+
+// ── Statut d'activité ────────────────────────────────────
+export const STATUT_ACTIVITE_LABELS: Record<string, string> = {
+  ACTIVE: "Active",
+  CLOTUREE: "Clôturée",
+  ARCHIVEE: "Archivée",
+};
+
+// ── Sens mouvement ───────────────────────────────────────
+export const SENS_MOUVEMENT_LABELS: Record<string, string> = {
+  ENTREE: "Entrée",
+  SORTIE: "Sortie",
+};
+
 // ── Canaux d'alerte ────────────────────────────────────────
 export const CANAL_LABELS: Record<string, string> = {
   email: "Email",
@@ -61,6 +84,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   Devise: "Devise",
   Menu: "Menu",
   Rapport: "Rapport",
+  Activite: "Activité",
+  MouvementActivite: "Mouvement activité",
 };
 
 // ── Helper générique ───────────────────────────────────────

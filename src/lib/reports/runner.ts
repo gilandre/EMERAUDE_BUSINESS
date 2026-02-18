@@ -6,6 +6,9 @@ import {
   SOURCE_LABELS,
   ACTION_LABELS,
   ENTITY_LABELS,
+  TYPE_ACTIVITE_LABELS,
+  STATUT_ACTIVITE_LABELS,
+  SENS_MOUVEMENT_LABELS,
   label,
 } from "@/lib/labels";
 
@@ -30,18 +33,27 @@ export async function executeReportQuery(
       return runAlertesDeclenchees(config);
     case "RAPPORT_AUDIT_UTILISATEURS":
       return runAuditUtilisateurs(config);
+    case "RAPPORT_ACTIVITES":
+      return runActivites(config);
+    case "RAPPORT_MOUVEMENTS_ACTIVITES":
+      return runMouvementsActivites(config);
     default:
       return runCustomQuery(config);
   }
 }
 
 async function runFinancierMensuel(_config: ReportQueryConfig): Promise<ReportRow[]> {
-  const marches = await prisma.marche.findMany({
-    include: {
-      accomptes: { select: { montant: true, dateEncaissement: true } },
-      decaissements: { select: { montant: true, dateDecaissement: true } },
-    },
-  });
+  const [marches, mouvementsActivites] = await Promise.all([
+    prisma.marche.findMany({
+      include: {
+        accomptes: { select: { montant: true, dateEncaissement: true } },
+        decaissements: { select: { montant: true, dateDecaissement: true } },
+      },
+    }),
+    prisma.mouvementActivite.findMany({
+      include: { activite: { select: { code: true, libelle: true, type: true } } },
+    }),
+  ]);
   const monthKey = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   const result: ReportRow[] = [];
@@ -68,6 +80,37 @@ async function runFinancierMensuel(_config: ReportQueryConfig): Promise<ReportRo
       });
     }
   }
+
+  // Mouvements activités groupés par mois
+  const actByMonth: Record<string, Record<string, { enc: number; dec: number }>> = {};
+  for (const mv of mouvementsActivites) {
+    const k = monthKey(mv.dateMouvement);
+    const actKey = `[ACT] ${mv.activite.code} - ${mv.activite.libelle}`;
+    if (!actByMonth[actKey]) actByMonth[actKey] = {};
+    if (!actByMonth[actKey][k]) actByMonth[actKey][k] = { enc: 0, dec: 0 };
+    if (mv.sens === "ENTREE") {
+      actByMonth[actKey][k].enc += Number(mv.montant);
+    } else {
+      actByMonth[actKey][k].dec += Number(mv.montant);
+    }
+  }
+  for (const [actKey, months] of Object.entries(actByMonth)) {
+    // Find the activity type for labeling
+    const actCode = actKey.replace("[ACT] ", "").split(" - ")[0];
+    const actMv = mouvementsActivites.find((mv) => mv.activite.code === actCode);
+    const typeLabel = actMv ? label(TYPE_ACTIVITE_LABELS, actMv.activite.type) : "";
+    for (const [month, vals] of Object.entries(months)) {
+      result.push({
+        Marché: actKey,
+        Statut: typeLabel,
+        Mois: month,
+        Encaissements: vals.enc,
+        Décaissements: vals.dec,
+        Trésorerie: vals.enc - vals.dec,
+      });
+    }
+  }
+
   return result.sort((a, b) => (a.Mois as string).localeCompare(b.Mois as string));
 }
 
@@ -101,7 +144,7 @@ async function runTresorerieParMarche(_config: ReportQueryConfig): Promise<Repor
 async function runAccomptesDecaissements(config: ReportQueryConfig): Promise<ReportRow[]> {
   const from = config.dateFrom ? new Date(config.dateFrom) : new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
   const to = config.dateTo ? new Date(config.dateTo) : new Date();
-  const [acc, dec] = await Promise.all([
+  const [acc, dec, mvAct] = await Promise.all([
     prisma.accompte.findMany({
       where: { dateEncaissement: { gte: from, lte: to } },
       include: { marche: { select: { code: true, libelle: true } } },
@@ -109,6 +152,10 @@ async function runAccomptesDecaissements(config: ReportQueryConfig): Promise<Rep
     prisma.decaissement.findMany({
       where: { dateDecaissement: { gte: from, lte: to } },
       include: { marche: { select: { code: true, libelle: true } } },
+    }),
+    prisma.mouvementActivite.findMany({
+      where: { dateMouvement: { gte: from, lte: to } },
+      include: { activite: { select: { code: true, libelle: true } } },
     }),
   ]);
   const accRows: ReportRow[] = acc.map((a) => ({
@@ -130,7 +177,19 @@ async function runAccomptesDecaissements(config: ReportQueryConfig): Promise<Rep
     Source: label(SOURCE_LABELS, d.source),
     Référence: d.reference ?? "",
   }));
-  const combined = [...accRows, ...decRows];
+  const mvActRows: ReportRow[] = mvAct.map((mv) => ({
+    Type: mv.sens === "ENTREE" ? "Entrée activité" : "Sortie activité",
+    Date: mv.dateMouvement.toISOString().slice(0, 10),
+    Marché: `[ACT] ${mv.activite.code}`,
+    Bénéficiaire: mv.beneficiaire ?? "",
+    Motif: mv.motif ?? "",
+    Montant: Number(mv.montant),
+    Statut: "",
+    Source: "",
+    Référence: mv.reference ?? "",
+    Description: mv.description ?? "",
+  }));
+  const combined = [...accRows, ...decRows, ...mvActRows];
   combined.sort((a, b) => (a.Date as string).localeCompare(b.Date as string));
   return combined;
 }
@@ -181,6 +240,63 @@ async function runAuditUtilisateurs(_config: ReportQueryConfig): Promise<ReportR
     Action: label(ACTION_LABELS, l.action),
     Entité: label(ENTITY_LABELS, l.entity),
     Description: l.description ?? "",
+  }));
+}
+
+async function runActivites(_config: ReportQueryConfig): Promise<ReportRow[]> {
+  const activites = await prisma.activite.findMany({
+    include: {
+      devise: { select: { code: true } },
+      responsable: { select: { nom: true, prenom: true } },
+      _count: { select: { mouvements: true } },
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+  return activites.map((a) => {
+    const budget = Number(a.budgetPrevisionnel ?? 0);
+    const sorties = Number(a.totalSorties);
+    return {
+      Code: a.code,
+      Libellé: a.libelle,
+      Type: label(TYPE_ACTIVITE_LABELS, a.type),
+      Statut: label(STATUT_ACTIVITE_LABELS, a.statut),
+      Devise: a.devise.code,
+      "Budget prévu": budget,
+      Entrées: Number(a.totalEntrees),
+      Sorties: sorties,
+      Solde: Number(a.solde),
+      "Solde (XOF)": Number(a.soldeXOF),
+      "Exécution budgétaire (%)": budget > 0 ? Math.round((sorties / budget) * 100) : 0,
+      Mouvements: a._count.mouvements,
+      Responsable: a.responsable ? `${a.responsable.prenom ?? ""} ${a.responsable.nom}`.trim() : "",
+      Début: a.dateDebut?.toISOString().slice(0, 10) ?? "",
+      Fin: a.dateFin?.toISOString().slice(0, 10) ?? "",
+    };
+  });
+}
+
+async function runMouvementsActivites(config: ReportQueryConfig): Promise<ReportRow[]> {
+  const from = config.dateFrom ? new Date(config.dateFrom) : new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+  const to = config.dateTo ? new Date(config.dateTo) : new Date();
+  const mouvements = await prisma.mouvementActivite.findMany({
+    where: { dateMouvement: { gte: from, lte: to } },
+    include: {
+      activite: { select: { code: true, libelle: true, deviseCode: true } },
+    },
+    orderBy: { dateMouvement: "desc" },
+  });
+  return mouvements.map((mv) => ({
+    Date: mv.dateMouvement.toISOString().slice(0, 10),
+    Activité: `${mv.activite.code} - ${mv.activite.libelle}`,
+    Sens: label(SENS_MOUVEMENT_LABELS, mv.sens),
+    Montant: Number(mv.montant),
+    "Montant (XOF)": Number(mv.montantXOF),
+    Devise: mv.activite.deviseCode,
+    Catégorie: mv.categorie ?? "",
+    Bénéficiaire: mv.beneficiaire ?? "",
+    Référence: mv.reference ?? "",
+    Motif: mv.motif ?? "",
+    "Mode paiement": mv.modePaiement ?? "",
   }));
 }
 

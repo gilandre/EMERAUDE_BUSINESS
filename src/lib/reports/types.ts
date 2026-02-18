@@ -1,4 +1,4 @@
-export type ReportTable = "Marche" | "Accompte" | "Decaissement";
+export type ReportTable = "Marche" | "Accompte" | "Decaissement" | "Activite";
 
 export type ReportColumn = string;
 

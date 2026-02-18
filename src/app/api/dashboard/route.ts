@@ -107,6 +107,10 @@ async function getHandler(req: Request, _ctx: { params: Promise<Record<string, s
     recentAuditLogs,
     recentMarches,
     alertesActivesCount,
+    activitesTotal,
+    activitesActives,
+    activitesSoldeAggregate,
+    recentActivites,
   ] = await Promise.all([
     prisma.marche.count(),
     prisma.marche.count({ where: { statut: "actif" } }),
@@ -230,6 +234,25 @@ async function getHandler(req: Request, _ctx: { params: Promise<Record<string, s
       },
     }),
     prisma.alerte.count({ where: { active: true } }),
+    // Activités KPIs
+    prisma.activite.count(),
+    prisma.activite.count({ where: { statut: "ACTIVE" } }),
+    prisma.activite.aggregate({ _sum: { soldeXOF: true } }),
+    prisma.activite.findMany({
+      take: 5,
+      orderBy: { updatedAt: "desc" },
+      select: {
+        id: true,
+        code: true,
+        libelle: true,
+        type: true,
+        statut: true,
+        solde: true,
+        soldeXOF: true,
+        deviseCode: true,
+        updatedAt: true,
+      },
+    }),
   ]);
 
   const totalAcc = Number(totalAccomptes._sum.montantXOF ?? 0);
@@ -378,6 +401,9 @@ async function getHandler(req: Request, _ctx: { params: Promise<Record<string, s
       decEvolution,
       alertesActives: alertesActivesCount,
       conversionRates,
+      activitesTotal,
+      activitesActives,
+      activitesSoldeGlobal: Number(activitesSoldeAggregate._sum.soldeXOF ?? 0),
     },
     chartData,
     treasuryEvolution,
@@ -407,6 +433,17 @@ async function getHandler(req: Request, _ctx: { params: Promise<Record<string, s
       entityId: a.entityId,
       description: a.description,
       createdAt: a.createdAt,
+    })),
+    recentActivites: recentActivites.map((a) => ({
+      id: a.id,
+      code: a.code,
+      libelle: a.libelle,
+      type: a.type,
+      statut: a.statut,
+      solde: Number(a.solde),
+      soldeXOF: Number(a.soldeXOF),
+      deviseCode: a.deviseCode,
+      updatedAt: a.updatedAt,
     })),
     recentMarches: recentMarches.map((m) => ({
       id: m.id,

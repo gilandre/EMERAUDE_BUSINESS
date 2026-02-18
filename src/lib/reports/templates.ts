@@ -81,4 +81,34 @@ export const REPORT_TEMPLATES: ReportTemplate[] = [
       columns: [],
     },
   },
+  {
+    code: "RAPPORT_ACTIVITES",
+    libelle: "Rapport Activités",
+    type: "activités",
+    config: {
+      tables: ["Activite"],
+      columns: [
+        { table: "Activite", field: "code", alias: "Code" },
+        { table: "Activite", field: "libelle", alias: "Libellé" },
+        { table: "Activite", field: "type", alias: "Type" },
+        { table: "Activite", field: "statut", alias: "Statut" },
+        { table: "Activite", field: "soldeXOF", alias: "Solde (XOF)" },
+      ],
+    },
+  },
+  {
+    code: "RAPPORT_MOUVEMENTS_ACTIVITES",
+    libelle: "Rapport Mouvements Activités",
+    type: "flux-activités",
+    config: {
+      tables: ["Activite"],
+      columns: [
+        { table: "Activite", field: "dateMouvement", alias: "Date" },
+        { table: "Activite", field: "montant", alias: "Montant" },
+        { table: "Activite", field: "sens", alias: "Sens" },
+      ],
+      dateFrom: "month",
+      dateTo: "month",
+    },
+  },
 ];

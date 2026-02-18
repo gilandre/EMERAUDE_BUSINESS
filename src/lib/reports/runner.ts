@@ -276,8 +276,10 @@ async function runActivites(_config: ReportQueryConfig): Promise<ReportRow[]> {
 }
 
 async function runMouvementsActivites(config: ReportQueryConfig): Promise<ReportRow[]> {
-  const from = config.dateFrom ? new Date(config.dateFrom) : new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
-  const to = config.dateTo ? new Date(config.dateTo) : new Date();
+  const parsedFrom = config.dateFrom ? new Date(config.dateFrom) : null;
+  const parsedTo = config.dateTo ? new Date(config.dateTo) : null;
+  const from = parsedFrom && !isNaN(parsedFrom.getTime()) ? parsedFrom : new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+  const to = parsedTo && !isNaN(parsedTo.getTime()) ? parsedTo : new Date();
   const mouvements = await prisma.mouvementActivite.findMany({
     where: { dateMouvement: { gte: from, lte: to } },
     include: {

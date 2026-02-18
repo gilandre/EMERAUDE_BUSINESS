@@ -103,6 +103,12 @@ jobs:
 
             cd "$DEPLOY_DIR"
 
+            # Ensure NEXTAUTH_URL is set in .env for production
+            if ! grep -q '^NEXTAUTH_URL=' .env 2>/dev/null; then
+              echo "NEXTAUTH_URL=http://${{ secrets.VPS_HOST }}" >> .env
+              echo "  -> Added NEXTAUTH_URL to .env"
+            fi
+
             # Source .env to get POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
             set -a && source .env && set +a
 

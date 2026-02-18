@@ -15,7 +15,7 @@ services:
       - NODE_OPTIONS=--max-old-space-size=384
       - DATABASE_URL=postgresql://${POSTGRES_USER:-emeraude}:${POSTGRES_PASSWORD:-emeraude}@postgres:5432/${POSTGRES_DB:-emeraude}
       - REDIS_URL=redis://redis:6379
-      - NEXTAUTH_URL=http://localhost
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-change-me-in-production}
     depends_on:
       postgres: { condition: service_healthy }
@@ -36,7 +36,7 @@ services:
       - NODE_OPTIONS=--max-old-space-size=384
       - DATABASE_URL=postgresql://${POSTGRES_USER:-emeraude}:${POSTGRES_PASSWORD:-emeraude}@postgres:5432/${POSTGRES_DB:-emeraude}
       - REDIS_URL=redis://redis:6379
-      - NEXTAUTH_URL=http://localhost
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-change-me-in-production}
     depends_on:
       postgres: { condition: service_healthy }

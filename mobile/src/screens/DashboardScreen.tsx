@@ -19,6 +19,8 @@ import {
   AlertTriangle,
   Calendar,
   Search,
+  Activity,
+  ChevronRight,
 } from 'lucide-react-native';
 import { ProgressBar } from '../components/ProgressBar';
 import { Skeleton, SkeletonCard } from '../components/Skeleton';
@@ -40,6 +42,9 @@ interface DashboardData {
     decEvolution?: number;
     marchesActifsDelta?: number;
     alertesActives?: number;
+    activitesTotal?: number;
+    activitesActives?: number;
+    activitesSoldeGlobal?: number;
   };
   recentMarches?: Array<{
     id: string;
@@ -66,6 +71,17 @@ interface DashboardData {
     sujet: string;
     libelle: string;
     createdAt: string;
+  }>;
+  recentActivites?: Array<{
+    id: string;
+    code: string;
+    libelle: string;
+    type: string;
+    statut: string;
+    solde: number;
+    soldeXOF: number;
+    deviseCode: string;
+    updatedAt: string;
   }>;
   seuilCritique?: number;
 }
@@ -156,6 +172,7 @@ export function DashboardScreen() {
   const recentMarches = data?.recentMarches ?? [];
   const deadlines = data?.deadlines ?? [];
   const recentAlerts = data?.recentAlerts ?? [];
+  const recentActivites = data?.recentActivites ?? [];
   const treasuryEvolution = data?.treasuryEvolution ?? [];
   const last7 = treasuryEvolution.slice(-7);
   const maxTreasury = Math.max(...last7.map((p) => Math.abs(p.tresorerie)), 1);
@@ -492,6 +509,92 @@ export function DashboardScreen() {
             </View>
             <Text style={[st.emptyText, { color: colors.textSecondary }]}>
               Aucune alerte récente
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Activités */}
+      <View style={st.sectionBlock}>
+        <View style={st.sectionHeaderRow}>
+          <Text style={[st.sectionTitle, { color: colors.text }]}>Activités</Text>
+          <TouchableOpacity onPress={() => (navigation as any).navigate('Activites')}>
+            <Text style={[st.detailsLink, { color: colors.primary }]}>Tout voir</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* KPI cards row */}
+        <View style={st.kpiGrid}>
+          <View style={[st.kpiCard, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
+            <Text style={[st.kpiLabel, { color: colors.textMuted }]}>Total</Text>
+            <Text style={[st.kpiValue, { color: colors.primary }]}>
+              {kpis.activitesTotal ?? 0}
+            </Text>
+          </View>
+          <View style={[st.kpiCard, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
+            <Text style={[st.kpiLabel, { color: colors.textMuted }]}>Actives</Text>
+            <Text style={[st.kpiValue, { color: colors.primary }]}>
+              {kpis.activitesActives ?? 0}
+            </Text>
+          </View>
+        </View>
+
+        {/* Solde global card */}
+        {(kpis.activitesTotal ?? 0) > 0 && (
+          <View style={[st.kpiCard, {
+            backgroundColor: colors.card,
+            borderColor: colors.borderLight,
+            marginBottom: spacing.smd,
+          }]}>
+            <Text style={[st.kpiLabel, { color: colors.textMuted }]}>Solde Global Activités</Text>
+            <Text style={[st.kpiValue, {
+              color: (kpis.activitesSoldeGlobal ?? 0) >= 0 ? colors.primary : '#ef4444',
+            }]}>
+              {formatShort(kpis.activitesSoldeGlobal ?? 0)}
+              <Text style={[st.kpiSuffix, { color: colors.textMuted }]}> FCFA</Text>
+            </Text>
+          </View>
+        )}
+
+        {/* Recent activités list */}
+        {recentActivites.length > 0 ? (
+          <View style={[st.alertsCard, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
+            {recentActivites.slice(0, 4).map((a, idx) => (
+              <TouchableOpacity
+                key={a.id}
+                activeOpacity={0.8}
+                onPress={() => (navigation as any).navigate('Activites', { screen: 'ActiviteDetail', params: { id: a.id } })}
+                style={[
+                  st.alertRow,
+                  idx < recentActivites.slice(0, 4).length - 1 && {
+                    borderBottomWidth: 1,
+                    borderBottomColor: colors.borderLight,
+                  },
+                ]}
+              >
+                <View style={[st.alertIconCircle, { backgroundColor: colors.primaryTint }]}>
+                  <Activity size={16} color={colors.primary} />
+                </View>
+                <View style={st.alertInfo}>
+                  <Text style={[st.alertTitle, { color: colors.text }]} numberOfLines={1}>{a.libelle}</Text>
+                  <Text style={[st.alertTime, { color: colors.textMuted }]}>
+                    {a.code} · {a.type} · {formatShort(a.soldeXOF)} FCFA
+                  </Text>
+                </View>
+                <ChevronRight size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : (
+          <View style={[st.emptyCard, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
+            <View style={st.emptyIconWrap}>
+              <Activity size={32} color={colors.textMuted} />
+            </View>
+            <Text style={[st.emptyText, { color: colors.textSecondary }]}>
+              Aucune activité
+            </Text>
+            <Text style={[st.emptySubtext, { color: colors.textMuted }]}>
+              Vos activités récentes apparaîtront ici
             </Text>
           </View>
         )}

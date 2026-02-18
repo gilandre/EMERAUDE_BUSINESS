@@ -30,6 +30,10 @@ export async function GET(req: NextRequest) {
     recentMarches,
     deadlines,
     recentAlerts,
+    activitesTotal,
+    activitesActives,
+    activitesSoldeGlobal,
+    recentActivites,
   ] = await Promise.all([
     prisma.marche.count({ where: { statut: "actif" } }),
     prisma.accompte.aggregate({ _sum: { montantXOF: true } }),
@@ -83,6 +87,24 @@ export async function GET(req: NextRequest) {
         alerte: { select: { libelle: true } },
       },
     }),
+    prisma.activite.count(),
+    prisma.activite.count({ where: { statut: "ACTIVE" } }),
+    prisma.activite.aggregate({ _sum: { soldeXOF: true } }),
+    prisma.activite.findMany({
+      take: 5,
+      orderBy: { updatedAt: "desc" },
+      select: {
+        id: true,
+        code: true,
+        libelle: true,
+        type: true,
+        statut: true,
+        solde: true,
+        soldeXOF: true,
+        deviseCode: true,
+        updatedAt: true,
+      },
+    }),
   ]);
 
   const totalAcc = Number(totalAccomptes._sum.montantXOF ?? 0);
@@ -121,6 +143,9 @@ export async function GET(req: NextRequest) {
       totalDecaissements: totalDec,
       encMois: Number(encMois._sum.montantXOF ?? 0),
       decMois: Number(decMois._sum.montantXOF ?? 0),
+      activitesTotal,
+      activitesActives,
+      activitesSoldeGlobal: Number(activitesSoldeGlobal._sum.soldeXOF ?? 0),
     },
     treasuryEvolution,
     recentMarches: recentMarches.map((m) => ({
@@ -145,6 +170,17 @@ export async function GET(req: NextRequest) {
       sujet: n.sujet,
       libelle: n.alerte?.libelle ?? "Alerte",
       createdAt: n.createdAt,
+    })),
+    recentActivites: recentActivites.map((a) => ({
+      id: a.id,
+      code: a.code,
+      libelle: a.libelle,
+      type: a.type,
+      statut: a.statut,
+      solde: Number(a.solde),
+      soldeXOF: Number(a.soldeXOF),
+      deviseCode: a.deviseCode,
+      updatedAt: a.updatedAt,
     })),
   };
 

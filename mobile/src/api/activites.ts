@@ -32,6 +32,7 @@ export interface MouvementActivite {
   description?: string | null;
   motif?: string | null;
   beneficiaire?: string | null;
+  beneficiaireId?: string | null;
   modePaiement?: string | null;
 }
 
@@ -108,5 +109,46 @@ export function deleteMouvement(
 ): Promise<void> {
   return apiFetch<void>(`/api/activites/${activiteId}/mouvements/${mouvementId}`, {
     method: 'DELETE',
+  });
+}
+
+export function updateActivite(
+  id: string,
+  data: {
+    libelle?: string;
+    description?: string;
+    type?: string;
+    statut?: string;
+    budgetPrevisionnel?: number;
+    dateDebut?: string;
+    dateFin?: string;
+    responsableId?: string;
+  },
+): Promise<Activite> {
+  return apiFetch<Activite>(`/api/activites/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateMouvement(
+  activiteId: string,
+  mouvementId: string,
+  data: {
+    sens?: 'ENTREE' | 'SORTIE';
+    montant?: number;
+    dateMouvement?: string;
+    categorie?: string;
+    reference?: string;
+    description?: string;
+    motif?: string;
+    beneficiaire?: string;
+    beneficiaireId?: string;
+    modePaiement?: string;
+  },
+): Promise<MouvementActivite> {
+  return apiFetch<MouvementActivite>(`/api/activites/${activiteId}/mouvements/${mouvementId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
   });
 }

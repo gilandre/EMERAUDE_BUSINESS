@@ -83,7 +83,7 @@ export function ActivitesScreen() {
       params.set('pageSize', '20');
       params.set('sortBy', 'updatedAt');
       params.set('sortOrder', 'desc');
-      if (debouncedSearch.trim()) params.set('q', debouncedSearch.trim());
+      if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
       if (filterType) params.set('type', filterType);
       if (filterStatut) params.set('statut', filterStatut);
 
